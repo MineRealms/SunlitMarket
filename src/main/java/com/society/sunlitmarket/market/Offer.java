@@ -1,0 +1,44 @@
+package com.society.sunlitmarket.market;
+
+import com.google.gson.JsonObject;
+
+/** One trade line. Prices are in "spur" units (Numismatics base value). */
+public final class Offer {
+    public String item;
+    public int count = 1;
+    /** Price the player pays to receive {@link #count} items. 0 = not sold by merchant. */
+    public int buy;
+    /** Price the merchant pays for {@link #count} items. 0 = not bought by merchant. */
+    public int sell;
+    /** Minimum independent reputation with the merchant faction. */
+    public int reputation;
+    /** Stock for one restock cycle. -1 = unlimited. Resets at the next in-game day. */
+    public int stock = -1;
+    /** Per-player purchase limit per in-game day. -1 = unlimited. */
+    public int limit = -1;
+    /** Optional per-player unlock id (quest stage). Blank = always available. */
+    public String unlock = "";
+    /** Reputation granted with this faction per completed trade. 0 = none. */
+    public int repGain = 0;
+
+    public Offer() {
+    }
+
+    public static Offer fromJson(JsonObject o) {
+        Offer offer = new Offer();
+        offer.item = o.has("item") ? o.get("item").getAsString() : "";
+        offer.count = Math.max(1, o.has("count") ? o.get("count").getAsInt() : 1);
+        offer.buy = Math.max(0, o.has("buy") ? o.get("buy").getAsInt() : 0);
+        offer.sell = Math.max(0, o.has("sell") ? o.get("sell").getAsInt() : 0);
+        offer.reputation = Math.max(0, o.has("reputation") ? o.get("reputation").getAsInt() : 0);
+        offer.stock = o.has("stock") ? o.get("stock").getAsInt() : -1;
+        offer.limit = o.has("limit") ? o.get("limit").getAsInt() : -1;
+        offer.unlock = o.has("unlock") ? o.get("unlock").getAsString() : "";
+        offer.repGain = Math.max(0, o.has("repGain") ? o.get("repGain").getAsInt() : 0);
+        return offer;
+    }
+
+    public boolean valid() {
+        return item != null && !item.isBlank() && (buy > 0 || sell > 0);
+    }
+}

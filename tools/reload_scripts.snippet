@@ -1,0 +1,7 @@
+net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+net.minecraft.server.MinecraftServer s = mc.getSingleplayerServer();
+dev.latvian.mods.kubejs.server.ServerScriptManager m = dev.latvian.mods.kubejs.server.ServerScriptManager.instance;
+if (s == null || m == null) return "not ready";
+net.minecraft.server.packs.resources.ResourceManager rm = mc.getResourceManager();
+s.execute(() -> m.reload(rm));
+return "reload scheduled with " + rm;
