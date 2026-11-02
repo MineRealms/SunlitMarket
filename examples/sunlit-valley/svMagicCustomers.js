@@ -34,10 +34,8 @@ if (typeof SunlitMarket !== 'undefined' && typeof global !== 'undefined' && Plat
   // 40 is the existing theme merchant's aquamarine buy price; starmetal is
   // scaled from the 240/150 ladder. Deeper materials carry a small premium.
   addMagic('as_aquamarine', 'astralsorcery:aquamarine', 2, 40, 0.80)
-  addMagic('as_starmetal', 'astralsorcery:starmetal_ingot', 1, 300, 0.78)
   addMagic('as_stardust', 'astralsorcery:stardust', 4, 24, 0.82)
   addMagic('as_infused_wood', 'astralsorcery:infused_wood', 4, 16, 0.84)
-  addMagic('as_resonating_gem', 'astralsorcery:resonating_gem', 1, 160, 0.80)
   addMagic('as_illumination', 'astralsorcery:illumination_powder', 4, 12, 0.84)
   addMagic('as_nocturnal', 'astralsorcery:nocturnal_powder', 4, 18, 0.84)
   addMagic('as_glass_lens', 'astralsorcery:glass_lens', 1, 40, 0.82)
@@ -48,7 +46,6 @@ if (typeof SunlitMarket !== 'undefined' && typeof global !== 'undefined' && Plat
   addMagic('tc_amber', 'thaumcraft:amber', 2, 40, 0.82)
   addMagic('tc_quicksilver', 'thaumcraft:quicksilver', 2, 50, 0.82)
   addMagic('tc_thaumium', 'thaumcraft:thaumium_ingot', 1, 220, 0.80)
-  addMagic('tc_void', 'thaumcraft:void_ingot', 1, 440, 0.78)
   addMagic('tc_alumentum', 'thaumcraft:alumentum', 4, 24, 0.84)
   addMagic('tc_nitor', 'thaumcraft:nitor', 4, 16, 0.84)
   addMagic('tc_greatwood', 'thaumcraft:greatwood_log', 8, 12, 0.88)
@@ -64,7 +61,6 @@ if (typeof SunlitMarket !== 'undefined' && typeof global !== 'undefined' && Plat
   addMagic('bot_livingrock', 'botania:livingrock', 16, botanical('botania:livingrock', 2), 0.88)
   addMagic('bot_manasteel', 'botania:manasteel_ingot', 1, botanical('botania:manasteel_ingot', 32), 0.88)
   addMagic('bot_mana_pearl', 'botania:mana_pearl', 1, botanical('botania:mana_pearl', 96), 0.84)
-  addMagic('bot_mana_diamond', 'botania:mana_diamond', 1, botanical('botania:mana_diamond', 1128), 0.78)
   addMagic('bot_white_petal', 'botania:white_petal', 8, botanical('botania:white_petal', 2), 0.88)
   addMagic('bot_spark', 'botania:spark', 1, botanical('botania:spark', 9), 0.86)
 

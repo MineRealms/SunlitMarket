@@ -151,10 +151,8 @@ svCustomers.js 不依赖自定义名称/语言，按实体类型 + 职业识别�
 | 物品 | 数量 | 市场参考 | 顾客 ask |
 |---|---:|---:|---:|
 | astralsorcery:aquamarine | 2 | 80 | 64 |
-| astralsorcery:starmetal_ingot | 1 | 300 | 234 |
 | astralsorcery:stardust | 4 | 96 | 79 |
 | astralsorcery:infused_wood | 4 | 64 | 54 |
-| astralsorcery:resonating_gem | 1 | 160 | 128 |
 | astralsorcery:illumination_powder | 4 | 48 | 40 |
 
 **Thaumcraft**（无 Shipping 锚，按现有神秘材料商 30/38/160/320 阶梯）
@@ -164,7 +162,6 @@ svCustomers.js 不依赖自定义名称/语言，按实体类型 + 职业识别�
 | thaumcraft:amber | 2 | 80 | 66 |
 | thaumcraft:quicksilver | 2 | 100 | 82 |
 | thaumcraft:thaumium_ingot | 1 | 220 | 176 |
-| thaumcraft:void_ingot | 1 | 440 | 343 |
 | thaumcraft:alumentum | 4 | 96 | 81 |
 | thaumcraft:nitor | 4 | 64 | 54 |
 
@@ -176,10 +173,9 @@ svCustomers.js 不依赖自定义名称/语言，按实体类型 + 职业识别�
 | botania:livingrock | 16 | 32 | 28 |
 | botania:manasteel_ingot | 1 | 32 | 28 |
 | botania:mana_pearl | 1 | 96 | 81 |
-| botania:mana_diamond | 1 | 1128 | 880 |
 | botania:white_petal | 8 | 16 | 14 |
 
-AS/TC/BOT 材料由旅行商人求购/求售；机器、多方块、仪式结构不进顾客池。新增 `theme_botania_merchant`（tag `sunlitmarket.theme.botania`），高阶材料使用 `theme.botania.adept` 解锁。
+AS/TC/BOT 材料由旅行商人求购/求售；机器、多方块、仪式结构不进顾客池。星辉锭/共鸣宝石、虚空锭、魔力钻石属于高阶材料，只放在主题商人的 unlock 货架，不进普通旅行商人池；新增 `theme_botania_merchant`（tag `sunlitmarket.theme.botania`），高阶材料使用 `theme.botania.adept` 解锁。
 
 ## 5. Middle-earth 派系货池
 
@@ -234,7 +230,7 @@ mod：
 ## 8. 静态检查记录
 
 - node --check：svCustomers.js、svMeCustomers.js、svMastery.js、meMerchants.js 全部通过。
-- Node 静态执行（完整价格数组）：650 条规则 / 635 个货池 / 15 条 NPC 规则，0 重复、0 个 ask≥market 的坏池；bread 为 22/14。FTBQ 重点章节覆盖：crops 89/89、fishing 75/75、pantry 12/12、minerals 44/44；AS/TC/BOT 魔法材料 20 条。
+- Node 静态执行（完整价格数组）：646 条规则 / 631 个货池 / 15 条 NPC 规则，0 重复、0 个 ask≥market 的坏池；bread 为 22/14。FTBQ 重点章节覆盖：crops 89/89、fishing 75/75、pantry 12/12、minerals 44/44；AS/TC/BOT 魔法材料 19 条。
 - gradle --no-daemon test build：通过（22 个单测，构建产物可生成）。
 - 未运行游戏；没有验证实体类型/职业名、物品 ID、货池实际生成、界面显示。
 - 服务端首次启动时建议检查 [SV-INTEGRATION] ... registered 日志和 SunlitMarket.factions()。

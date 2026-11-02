@@ -123,7 +123,7 @@
 
 ## 6. 当前状态
 
-- 现有 delta 包里的货池是**第二版**：完整 global 数组 635 条，覆盖的是 Shipping 锚 + 重点 FTBQ 商品 + AS/TC/BOT 材料，不是全量。
+- 现有 delta 包里的货池是**第二版**：完整 global 数组 631 条，覆盖的是 Shipping 锚 + 重点 FTBQ 商品 + AS/TC/BOT 材料，不是全量。
 - 本文的审计数据已经生成；在完成 A/B/C 统一生成器之前，**不应把当前 delta 当作最终经济版本**。
 - 静态审计未启动游戏；GT 动态配方和任务-only 分类需要服务器/JEI 数据继续补。
 
@@ -148,8 +148,8 @@
 - 作物现在覆盖 FTBQ 89/89；鱼覆盖 75/75；矿物覆盖 44/44。
 - 饮料按 `global.wines/brews/cocktails/herbalBrews` 全量生成；`global.brews` 在运行时由 `brewingStationRecipes` 填充，包含 19 种啤酒/威士忌。
 - 文物（artifacts）和宝石只进旅行商人，按价值 0.78–0.82 收购；不进普通农户/渔夫池。
-- 第二版静态执行：**650 条规则 / 635 个货池 / 15 条 NPC 规则，0 重复、0 个 ask≥market 的坏池**（完整 global 数组）。
-- AS/TC/BOT 材料：20 条旅行商人货池；AS/TC 用现有主题商人价 + 配方深度，Botania 用 Shipping 锚。
+- 第二版静态执行：**646 条规则 / 631 个货池 / 15 条 NPC 规则，0 重复、0 个 ask≥market 的坏池**（完整 global 数组）。
+- AS/TC/BOT 材料：19 条旅行商人货池；AS/TC 用现有主题商人价 + 配方深度，Botania 用 Shipping 锚；高阶星辉锭/共鸣宝石/虚空锭/魔力钻石只在主题商人 unlock 货架。
 
 仍未覆盖：
 
