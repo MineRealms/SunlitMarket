@@ -1,15 +1,12 @@
 package com.society.sunlitmarket.deposit;
 
 import com.society.sunlitmarket.SunlitMarketMod;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.common.extensions.IForgeMenuType;
-import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.registries.DeferredRegister;
@@ -45,12 +42,4 @@ public final class DepositRegistry {
         event.enqueueWork(DepositValues::refresh);
     }
 
-    /** Attaches item/fluid/FE/essentia/mana to every bin. */
-    public static void attach(AttachCapabilitiesEvent<BlockEntity> event) {
-        if (event.getObject() instanceof DepositBinBlockEntity bin) {
-            DepositCapabilities capabilities = new DepositCapabilities(bin);
-            event.addCapability(new ResourceLocation(SunlitMarketMod.MOD_ID, "deposit_bin"), capabilities);
-            event.addListener(capabilities::invalidate);
-        }
-    }
 }

@@ -74,8 +74,6 @@ public final class SunlitMarketMod {
         MinecraftForge.EVENT_BUS.addListener(EventPriority.LOWEST, true, this::onEntityInteract);
         MinecraftForge.EVENT_BUS.addListener(this::onEntityJoin);
         MinecraftForge.EVENT_BUS.addListener(this::onChangeTarget);
-        MinecraftForge.EVENT_BUS.addGenericListener(net.minecraft.world.level.block.entity.BlockEntity.class,
-                com.society.sunlitmarket.deposit.DepositRegistry::attach);
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> { com.society.sunlitmarket.client.MarketClient.init(); com.society.sunlitmarket.client.CounterClient.init(); com.society.sunlitmarket.client.DepositClient.init(); });
     }
 

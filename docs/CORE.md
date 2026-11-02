@@ -54,6 +54,28 @@ Every pixel is drawn by `client/Ui` from `GuiGraphics.fill` primitives - no text
 
 Client/server split: every class under `client/` may touch `net.minecraft.client.*`; nothing outside it may. S2C handlers reach the GUI only through `client/ClientPacketHandlers`, and the built jar is scanned to keep it that way (a dedicated server previously died with `NoClassDefFoundError: net/minecraft/client/gui/screens/Screen`).
 
+## Acceptance bin
+
+`sunlitmarket:deposit_bin` drains five different industrial outputs into one payout, so a late-game player has somewhere to dump surplus without a per-mod hopper chain.
+
+| Intake | Capability | Capacity | Rate |
+|---|---|---:|---|
+| Item | Forge `IItemHandler` | 1 stack | the pawnshop's own sell table (`Offer.sell / count`), 0 if no merchant buys it |
+| Fluid | Forge `IFluidHandler` | 8 buckets | 1-10 spur per bucket by fluid id, 1 for anything unlisted |
+| FE | Forge `IEnergyStorage` | 2M | 1 spur per 50,000 FE |
+| Essentia | Thaumcraft `EssentiaCapabilities.TRANSPORT` | 128 | 1 spur per point |
+| Mana | Botania `MANA_RECEIVER` | 1M | 1 spur per 2,000 mana |
+
+Energy is priced worst on purpose: GT electricity has no production ceiling, so any meaningful rate would be a printing press. GT itself needs no special code - GTCEu machines and converters expose Forge `IEnergyStorage`, so a `gtceu:*_energy_converter` bridges EU into the FE port.
+
+`collect()` prices everything, credits the wallet through `Currency.settle` **first**, and only then clears the intakes. A failed payout therefore never destroys goods.
+
+Optional mods are optional at runtime, not just at compile time: the Thaumcraft port compiles against the exact 20748 api jar vendored in `libs/` and is only instantiated behind `ModList.isLoaded("thaumcraft")`; Botania is reached with a dynamic proxy, so there is no 12 MB compile dependency and no class-loading failure on a pack without it.
+
+Client/server split: the block, block entity, menu and valuation live outside `client/`; only `DepositBinScreen` touches `net.minecraft.client.*`. State reaches the screen as `DepositStateMessage` (S2C id 8), and the payout button rides `clickMenuButton(0)` so no C2S packet is needed.
+
+Known gap: the bin still pays without a daily budget. That is the `BuybackBudgetManager` from `ECONOMY_MODEL_V2.md` §7 and is not implemented yet.
+
 ## Trading counter
 
 Craft `sunlitmarket:counter` using wooden slabs and planks, or obtain it with a development command. Its nine inventory slots are shared only with the owning player/team. Hoppers have no exposed sided slots.

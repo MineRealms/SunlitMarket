@@ -281,7 +281,7 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - 服务端：`ChartView` / `ChartService`（`market` 包，不引用任何客户端类）把指数列表、当前值、`lastBucket` 和最多 120 根蜡烛序列化成 JSON；`ChartRequestMessage`(C2S, id 6) / `ChartDataMessage`(S2C, id 7) 注册在 common setup。请求是只读的，不需要交易会话。
 - 客户端：`client/ChartScreen` 自绘蜡烛（`GuiGraphics.fill`，无第三方图表库），y 轴按可见最高/最低自动缩放并留 5% 边距，悬停十字线显示该 bucket 的开/高/低/收；指数页签和 1日/4时 页签都是重新请求而不是本地过滤，保证客户端不持有第二份定价逻辑。关闭面板回到商店而不是掉回世界。
 - 入口：商店窗口的「行情」按钮（无需权限）；`/sunlitmarket chart [index] [period]` 供管理员从控制台打开。
-- GUI：`MarketScreen` 改为固定尺寸窗框（深空当铺 UI 九宫格贴图），搜索框按物品 ID 和本地化名过滤（`Ctrl+F` 聚焦），翻页按钮换成滚动条（滚轮 / 点击轨道 / 拖动滑块），物品悬停显示 tooltip，状态行新增「货架溢价 ±N%」（`baseBuy`/`baseSell` = 不含 E1 稀缺系数的同一条报价）。
+- GUI：`MarketScreen` 改为固定尺寸窗框（全部由 `client/Ui` 用 `GuiGraphics.fill` 自绘，无贴图、无原版 Button），搜索框按物品 ID 和本地化名过滤（`Ctrl+F` 聚焦），翻页按钮换成滚动条（滚轮 / 点击轨道 / 拖动滑块），物品悬停显示 tooltip，状态行新增「货架溢价 ±N%」（`baseBuy`/`baseSell` = 不含 E1 稀缺系数的同一条报价）。
 - 客户端/服务端隔离：S2C 一律经 `client/ClientPacketHandlers`；构建后扫描 jar，`net/minecraft/client` 只出现在 `client` 包（70 个非 client 类，0 泄漏）。
 - `gradle --no-daemon test build` 通过：**48 个单测全过**（新增 ChartViewTest 4）。jar sha256 前缀 `661d2b8d`，已同步主客户端 / -DEV / mirror / server-pack 暂存目录。
 - **DEV 实测发现并修掉一个 E2 遗留 bug**：KubeJS 服务端脚本在资源重载阶段求值，客户端此时集成服务器还没建好，`ServerLifecycleHooks.getCurrentServer()` 是 null，`svIndices.js` 的三次 `SunlitMarket.index(...)` 全部被丢弃（日志里三条 `SunlitMarket.index needs a running server`，但脚本自己的 `[SV-INTEGRATION] price indices registered` 照常打印，极具误导性）。现在定义先进 `PendingIndices` 缓冲，`ServerStartedEvent` 时回放（换世界重进也会重放），提交 `a786346`。`SunlitMarket.index` 改成返回 boolean，另加 `clearIndices()`。
@@ -290,3 +290,18 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - 观察点：点「行情」后出现 3 个指数页签、蜡烛随交易变化、切 4时 不卡；搜索框输入中文/英文都能过滤；滚动条可拖动且松手后按钮仍可点。蜡烛要跑满一个 bucket 才会出现第二根（4时 = 4000 tick ≈ 3.3 现实分钟），开局只有一根横线是数据量问题。
 - 已知小瑕疵：指数页签顺序在重启后会变——`MarketData.load` 用 `CompoundTag.getAllKeys()`（哈希序），未持久化声明顺序。只影响观感，未修。
 - 已知限制：蜡烛要在服务器跑满一个 bucket 才会出现第二根，第一天只有一根会显示为一条横线——这是数据量问题，不是渲染问题。
+
+## 13. 接受仓（deposit_bin）
+
+- 方块 + 方块实体 + 菜单 + 估值全部在 `deposit` 包（不引用任何 `net.minecraft.client.*`），只有 `client/DepositBinScreen` 是客户端类。
+- 五路入口：物品 `IItemHandler`（1 格）、流体 `IFluidHandler`（8000 mB）、FE `IEnergyStorage`（2M）、TC4R 源质 `EssentiaCapabilities.TRANSPORT`（128 点）、Botania 魔力 `MANA_RECEIVER`（1M）。
+- 物品价格直接取当铺自己的收购表（`Offer.sell / count` 取各商人最大值），没有第二份定价。未在货单里的物品（例如金锭）价值为 0，拒绝支付而不是给个随手价。
+- 其余四路是固定低汇率：流体 1–10 spur/桶（汽油 10、柴油 8、油 6、硫酸 3，其余 1）；FE 每 5 万换 1；源质每点 1；魔力每 2000 换 1。电给得最差是刻意的——GT 的电力没有产能上限，任何有意义的电价都是印钞机。
+- `collect()` 先 `Currency.settle` 入账，成功后才清空五路存储；付款失败时物品不会被销毁。
+- 可选模组在运行期才解析：TC4R 用 `libs/` 里的 20748 api jar 编译（与客户端版本一致），只在 `ModList.isLoaded("thaumcraft")` 分支里实例化；Botania 用动态代理，不引入 12 MB 编译依赖，缺模组时不会 NoClassDefFoundError。
+- 状态同步：`DepositStateMessage`(S2C id 8) 每 10 tick 与打开时下发；「回收」按钮走 `clickMenuButton(0)`，没有额外的 C2S 包。协议版本从 2 提到 3。
+- 贴图由 GTCEu 机壳拼合（`machine_casing_solid_steel` + `machine_casing_gearbox_steel`），生成脚本在 `build/gen_textures.py`，输出 `deposit_bin_{top,side,front}.png`。
+- `gradle --no-daemon test build` 通过，构建后扫描 jar：88 个非 client 类，0 个引用 `net/minecraft/client`。
+- DEV 实测证据（2026-11-02 22:34）：把漏斗放在接受仓上方，`item replace` 灌 4 个金锭 → 漏斗清空、`data get block` 显示 `Items:[{Slot:0,id:"minecraft:gold_ingot",Count:4}]`，证明 `IItemHandler` 能力确实挂上了；估值函数实测 `4 铁锭=120 / 10 粗铁=90 / 8 桶柴油=64 / 2M FE=40 / 128 源质=128 / 1M 魔力=500`。
+- 观察点：右键（空手/潜行）开界面，界面显示五路存量与各自折算值，底部「合计 N spur」+「回收」按钮；手持物品右键直接放入（不进界面）。
+- 已知限制：还没有每日回收预算（`ECONOMY_MODEL_V2.md` §7 的 `BuybackBudgetManager`），现在只要塞满就能换钱；源质/魔力的汇率尚未经过实测调参。

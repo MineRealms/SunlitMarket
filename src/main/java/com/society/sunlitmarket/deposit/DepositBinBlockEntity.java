@@ -67,6 +67,18 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
         this.mana = DepositCompat.mana(this);
     }
 
+    // ------------------------------------------------------------ capabilities
+
+    private DepositCapabilities capabilities;
+
+    @Override
+    public <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable net.minecraft.core.Direction side) {
+        if (capabilities == null) capabilities = new DepositCapabilities(this);
+        LazyOptional<T> found = capabilities.getCapability(cap, side);
+        if (found.isPresent()) return found;
+        return super.getCapability(cap, side);
+    }
+
     // ------------------------------------------------------------ menu
 
     @Override
