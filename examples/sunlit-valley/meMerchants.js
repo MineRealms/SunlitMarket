@@ -81,9 +81,9 @@ if (typeof SunlitMarket !== 'undefined' && Platform.isLoaded('me')) {
     name: '洛汗猎手',
     faction: 'me:rohan',
     tag: 'sunlitmarket.me.rohan_hunter',
-    // The shipped ME faction table classifies this type as both CIVILIAN and MILITIA.
-    // Keep the merchant mapping, but the customer rank resolver deliberately returns UNKNOWN.
-    npcType: 'me:rohan.militia',
+    // No unambiguous civilian type in this shipped ME build. Require the explicit
+    // merchant tag; matching all rohan.militia would also make soldiers immune to AI targets.
+    npcType: '',
     offers: [
       { item: 'me:cooked_goose', count: 1, buy: 40, sell: 28 },
       { item: 'me:cooked_duck', count: 1, buy: 40, sell: 28 },

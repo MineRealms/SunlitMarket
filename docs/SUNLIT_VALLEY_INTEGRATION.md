@@ -1,7 +1,7 @@
 # Sunlit Valley 深度联动与价格规划
 
 > 工程：SunlitMarket（Java）+ 整合包 kubejs/server_scripts/sunlitmarket/
-> 状态：**第一版静态实现完成，未做游戏内验收**（本地整合包 400+ mod，单人世界无法进入；等待服务器验证）。
+> 状态：**第一版静态实现完成，顾客身份映射已按 Middle-earth 1.4.2-port.0 出货 faction 数据修正；未做游戏内验收**（服务器环境等待验收）。纯静态脚本/schema检查不代表 ME NPC 实际触发柜台请求。
 > 全量覆盖审计见 [SV_PRICE_AUDIT.md](SV_PRICE_AUDIT.md)：1,735 个 FTBQ 任务物品中只有 529 个有 Shipping 锚，699 个有直接配方，800 个仍需 GT 动态配方/阶段兜底。
 > 本文是价格和边界的说明；第一版货池不是最终全量价格表。
 
@@ -189,11 +189,11 @@ svMeCustomers.js 给 ME 平民补货池，身份仍由 NpcData.Type 的原生 fa
 | me:lothlorien | 草莓、幽灵菇、黄鹅膏、喇叭菇、烟叶 |
 | me:longbeards.erebor | 亚麻、铁矿、煤、铅矿、银矿 |
 | me:dale | 面包、线、卷心菜、蓝莓 |
-| me:neutral | 纸、书、晶石、帆布 |
+| me:neutral | 纸、书、晶石、帆布（当前出货 ME 1.4.2 faction 表没有 `me:neutral`；需额外安装规则才会触发） |
 | me:brigand / me:isengard / me:mordor | 便宜赃物（钻石、金、下界合金碎片、火药），带 heat/wanted |
 | me:moria / me:goblin_town / me:hobgoblin_tribes.gundabad / me:wild_goblins | 矿石、煤、赃物 |
 
-显式身份规则只覆盖出货 jar 中确认且不与战斗 rank 冲突的 type（例如 `me:shire.peasant`、`me:gondor.peasant`、`me:dale.peasant`、`me:lothlorien.sentinel`、`me:longbeards.erebor.peasant/miner`、`me:isengard.snaga`、`me:mordor.snaga`）。`me:rohan.militia`、`me:brigand.thug`、`me:wild_goblins.gatherer`、`me:woodland_realm.ranger` 在 rank pool 中有冲突，默认不强制作为顾客；身份和pool仍以 `FactionRelations`/`MarketRules` 的实际快照为准。
+显式身份规则只覆盖出货 jar 中确认且不与战斗 rank 冲突的 type（例如 `me:shire.peasant`、`me:gondor.peasant`、`me:dale.peasant`、`me:lothlorien.sentinel`、`me:longbeards.erebor.peasant/miner`、`me:isengard.snaga`、`me:mordor.snaga`、`me:goblin_town.goblin`、`me:hobgoblin_tribes.gundabad.goblin`、`me:moria.goblin`）。`me:rohan.militia`、`me:brigand.thug`、`me:wild_goblins.gatherer`、`me:woodland_realm.ranger` 在 rank pool 中有冲突，默认不强制作为顾客；身份和pool仍以 `FactionRelations`/`MarketRules` 的实际快照为准。`me:neutral` 不在本次核对的出货 faction JSON 集合中，示例货池需额外规则才有效。
 
 ## 6. 阶段桥
 
