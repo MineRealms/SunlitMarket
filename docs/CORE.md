@@ -44,11 +44,13 @@ FTB Teams is optional. Shared party teams use a typed `team:<uuid>` owner even w
 
 The 行情 button in the shop window sends `ChartRequestMessage` (C2S, read-only, no trade session needed); the server answers with a serialised `ChartView` through `ChartDataMessage`. Index and period tabs re-request rather than filter locally, so the client never holds a second copy of the pricing rules. `/sunlitmarket chart [index] [period]` opens the same panel from the console. Closing the chart returns to the shop instead of the world.
 
-Candles are drawn with `GuiGraphics.fill` (no chart library); the y axis auto-scales to the visible high/low with 5% padding, and hovering shows that bucket's open/high/low/close. Colour convention is 红涨绿跌 (red up, green down). A period is 24000 ticks (one in-game day) or 4000 ticks (four in-game hours), matching `MarketData.PERIODS`.
+The panel shares `client/Ui` with the shop window, so both windows have the same frame, header stripe, chip tabs and footer. Candles are drawn with `GuiGraphics.fill` (no chart library); the y axis auto-scales to the visible high/low with 5% padding, and hovering shows that bucket's open/high/low/close. Colour convention is 红涨绿跌 (red up, green down). A period is 24000 ticks (one in-game day) or 4000 ticks (four in-game hours), matching `MarketData.PERIODS`.
 
 ## Shop window
 
 `MarketScreen` is a fixed-size framed window: search box (filters by item id and localised name, `Ctrl+F` focuses it), scrollbar (wheel, track click, thumb drag) and item tooltips. The status line under each item shows stock, daily limit, reputation requirement, unlock state and the shelf premium - the difference between the current quote and the same quote without the E1 scarcity factor, which is what `baseBuy`/`baseSell` in `MarketView` carry.
+
+Every pixel is drawn by `client/Ui` from `GuiGraphics.fill` primitives - no textures, no vanilla `Button`. The layout is a fixed rhythm (20px header, 18px toolbar, N rows of 22px, 18px footer, 6px gutters) inside a 360px window, so nothing reflows when the list is short and no asset can go missing at runtime. The one vanilla widget left is the borderless `EditBox` behind the search frame, because text input, selection and the caret are not worth reimplementing.
 
 Client/server split: every class under `client/` may touch `net.minecraft.client.*`; nothing outside it may. S2C handlers reach the GUI only through `client/ClientPacketHandlers`, and the built jar is scanned to keep it that way (a dedicated server previously died with `NoClassDefFoundError: net/minecraft/client/gui/screens/Screen`).
 

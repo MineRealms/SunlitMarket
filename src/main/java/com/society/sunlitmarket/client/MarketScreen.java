@@ -6,8 +6,6 @@ import com.society.sunlitmarket.market.MarketView;
 import com.society.sunlitmarket.net.ChartRequestMessage;
 import com.society.sunlitmarket.net.MarketActionMessage;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -19,25 +17,46 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * The pawnshop window: searchable offer list with a real scrollbar.
  *
- * <p>Client-only. All prices, stock and unlock state come from {@link MarketView}; this screen
- * never decides what a trade costs.
+ * <p>Every pixel is drawn by {@link Ui}; the only vanilla widget is the {@link EditBox} that
+ * receives keystrokes (borderless, so it inherits our own search frame). All prices, stock and
+ * unlock state come from {@link MarketView} — this screen never decides what a trade costs.
+ *
+ * <p>Client-only.
  */
 public final class MarketScreen extends Screen {
-    private static final int ROW_H = 26;
+    // Vertical rhythm: header / toolbar / list / footer, 6px gutters everywhere.
+    private static final int PAD = 8;
+    private static final int HEADER_H = 20;
+    private static final int TOOLBAR_H = 18;
+    private static final int ROW_H = 22;
+    private static final int FOOTER_H = 18;
+    private static final int GAP = 6;
+    private static final int MAX_ROWS = 7;
+    private static final int MIN_ROWS = 3;
+
+    // Horizontal rhythm inside a row.
+    private static final int ICON = 16;
+    private static final int BTN_W = 52;
+    private static final int BTN_H = 16;
+    private static final int BTN_GAP = 4;
+    private static final int TRACK_W = 6;
+    private static final int CHART_W = 56;
+    private static final int CLOSE = 9;
+
     private static final int BUY = 0;
     private static final int SELL = 1;
-    private static final int SCROLL_W = 10;
 
     private MarketView view;
     private String error;
     private String query = "";
     private final List<Integer> filtered = new ArrayList<>();
-    private final List<AbstractWidget> rowWidgets = new ArrayList<>();
     private int offset;
+    private int rows;
     private boolean pending;
     private EditBox search;
 
@@ -45,14 +64,22 @@ public final class MarketScreen extends Screen {
     private int panelH;
     private int left;
     private int top;
+    private int contentLeft;
+    private int contentRight;
+    private int toolbarY;
     private int listLeft;
     private int listRight;
     private int listTop;
     private int listBottom;
+    private int footerY;
     private int searchX;
     private int searchY;
     private int searchW;
+    private int chartX;
     private int trackX;
+    private int closeX;
+    private int closeY;
+
     private boolean dragging;
     private double dragGrab;
 
@@ -71,67 +98,83 @@ public final class MarketScreen extends Screen {
         pending = false;
         rebuildFilter();
         clampOffset();
-        rebuildRows();
     }
 
     // ---------------------------------------------------------------- layout
 
     private void layout() {
-        panelW = Math.min(400, width - 16);
-        panelH = Math.min(272, height - 16);
+        panelW = Math.min(360, width - 20);
+        int maxRows = (height - 20 - 80) / ROW_H;
+        rows = Math.max(MIN_ROWS, Math.min(MAX_ROWS, maxRows));
+        panelH = 80 + rows * ROW_H;
         left = (width - panelW) / 2;
         top = (height - panelH) / 2;
-        listLeft = left + 10;
-        listRight = left + panelW - 18;
-        listTop = top + 62;
-        listBottom = top + panelH - 30;
-        searchX = left + 10;
-        searchY = top + 42;
-        searchW = panelW - 176;
-        trackX = left + panelW - 15;
-    }
 
-    private int visibleRows() {
-        return Math.max(1, (listBottom - listTop) / ROW_H);
+        contentLeft = left + PAD;
+        contentRight = left + panelW - PAD;
+        toolbarY = top + HEADER_H + GAP;
+        listTop = toolbarY + TOOLBAR_H + GAP;
+        listBottom = listTop + rows * ROW_H;
+        footerY = listBottom + GAP;
+
+        trackX = contentRight - TRACK_W;
+        listLeft = contentLeft;
+        listRight = trackX - 5;
+
+        chartX = contentRight - CHART_W;
+        searchX = contentLeft;
+        searchY = toolbarY;
+        searchW = chartX - GAP - searchX;
+
+        closeX = left + panelW - PAD - CLOSE;
+        closeY = top + (HEADER_H - CLOSE) / 2;
     }
 
     private int maxOffset() {
-        return Math.max(0, filtered.size() - visibleRows());
+        return Math.max(0, filtered.size() - rows);
     }
 
     private void clampOffset() {
         offset = Math.max(0, Math.min(offset, maxOffset()));
     }
 
+    private int rowY(int index) {
+        return listTop + index * ROW_H;
+    }
+
+    private int buyX() {
+        return listRight - BTN_W * 2 - BTN_GAP;
+    }
+
+    private int sellX() {
+        return listRight - BTN_W;
+    }
+
     @Override
     protected void init() {
         layout();
         clampOffset();
-        search = new EditBox(font, searchX + 20, searchY + 4, searchW - 26, 10, Component.literal("搜索"));
+        search = new EditBox(font, searchX + 6, searchY + 5, searchW - 12 - 36, 8, Component.literal("搜索"));
         search.setBordered(false);
         search.setMaxLength(32);
         search.setValue(query);
+        search.setTextColor(Ui.TEXT);
+        search.setSuggestion("搜索物品…");
         search.setResponder(this::onQuery);
         addRenderableWidget(search);
-        addRenderableWidget(Button.builder(Component.literal("行情"), b -> openChart())
-                .bounds(left + panelW - 58, searchY - 1, 48, 18).build());
-        addRenderableWidget(Button.builder(Component.literal("关闭"), b -> this.onClose())
-                .bounds(left + panelW / 2 - 30, top + panelH - 24, 60, 18).build());
-        rebuildRows();
     }
 
-    // ---------------------------------------------------------------- filter + rows
+    // ---------------------------------------------------------------- filter
 
     private void onQuery(String text) {
         query = text == null ? "" : text;
         rebuildFilter();
         offset = 0;
-        rebuildRows();
     }
 
     private void rebuildFilter() {
         filtered.clear();
-        String needle = query.trim().toLowerCase(java.util.Locale.ROOT);
+        String needle = query.trim().toLowerCase(Locale.ROOT);
         for (int i = 0; i < view.offers.size(); i++) {
             MarketView.Line line = view.offers.get(i);
             if (needle.isEmpty() || matches(line, needle)) {
@@ -141,10 +184,10 @@ public final class MarketScreen extends Screen {
     }
 
     private static boolean matches(MarketView.Line line, String needle) {
-        String id = line.item == null ? "" : line.item.toLowerCase(java.util.Locale.ROOT);
+        String id = line.item == null ? "" : line.item.toLowerCase(Locale.ROOT);
         if (id.contains(needle)) return true;
         String name = displayName(line.item);
-        return name != null && name.toLowerCase(java.util.Locale.ROOT).contains(needle);
+        return name != null && name.toLowerCase(Locale.ROOT).contains(needle);
     }
 
     private static String displayName(String id) {
@@ -157,31 +200,17 @@ public final class MarketScreen extends Screen {
         }
     }
 
-    private void rebuildRows() {
-        for (AbstractWidget widget : rowWidgets) {
-            removeWidget(widget);
-        }
-        rowWidgets.clear();
-        int rows = visibleRows();
-        for (int i = 0; i < rows; i++) {
-            int position = offset + i;
-            if (position >= filtered.size()) break;
-            final int offer = filtered.get(position);
-            MarketView.Line line = view.offers.get(offer);
-            int y = listTop + i * ROW_H + 4;
-            if (line.buy > 0 && line.stock != 0 && !line.locked) {
-                rowWidgets.add(addRenderableWidget(Button.builder(Component.literal("买 " + line.buy),
-                        b -> send(offer, BUY)).bounds(left + panelW - 142, y, 60, 18).build()));
-            }
-            if (line.sell > 0 && !line.locked) {
-                rowWidgets.add(addRenderableWidget(Button.builder(Component.literal("卖 " + line.sell),
-                        b -> send(offer, SELL)).bounds(left + panelW - 78, y, 60, 18).build()));
-            }
-        }
+    private static boolean canBuy(MarketView.Line line) {
+        return line.buy > 0 && line.stock != 0 && !line.locked;
+    }
+
+    private static boolean canSell(MarketView.Line line) {
+        return line.sell > 0 && !line.locked;
     }
 
     private void send(int offerIndex, int action) {
         if (pending || view.session.isEmpty()) return;
+        if (offerIndex < 0 || offerIndex >= view.offers.size()) return;
         pending = true;
         MarketView.Line line = view.offers.get(offerIndex);
         SunlitMarketMod.CHANNEL.sendToServer(new MarketActionMessage(view.merchantId, offerIndex, action, 1,
@@ -195,81 +224,117 @@ public final class MarketScreen extends Screen {
     // ---------------------------------------------------------------- render
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(graphics);
-        graphics.fill(0, 0, width, height, 0x66000000);
-        GuiArt.panel(graphics, left, top, panelW, panelH);
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        renderBackground(g);
+        g.fill(0, 0, width, height, Ui.SCRIM);
+        drawChrome(g, mouseX, mouseY);
+        drawToolbar(g, mouseX, mouseY);
+        int hoverRow = drawList(g, mouseX, mouseY);
+        drawFooter(g);
 
-        GuiArt.icon(graphics, GuiArt.MERCHANT, 19, 19, left + 8, top + 6);
-        graphics.drawString(font, font.plainSubstrByWidth(title.getString(), panelW - 60), left + 26, top + 9, 0xFFE8D9A8, false);
-        drawClose(graphics, mouseX, mouseY);
+        super.render(g, mouseX, mouseY, partialTick);
 
-        String info = "余额 " + view.balance + " spur   ·   " + view.faction + " " + view.reputation
-                + (view.title == null || view.title.isEmpty() ? "" : " (" + view.title + ")");
-        graphics.drawString(font, font.plainSubstrByWidth(info, panelW - 24), left + 10, top + 29, 0xCCCCCC, false);
-
-        GuiArt.searchField(graphics, searchX, searchY, searchW, 16);
-        GuiArt.icon(graphics, GuiArt.SEARCH_ICON, 32, 32, searchX + 4, searchY + 2);
-
-        String counter = filtered.size() + "/" + view.offers.size() + " 件";
-        graphics.drawString(font, counter, left + panelW - 62 - font.width(counter), searchY + 4, 0xFF8A94A0, false);
-
-        graphics.fill(listLeft - 2, listTop - 2, listRight + 2, listBottom + 2, 0x33000000);
-
-        int rows = visibleRows();
-        int hoverRow = -1;
-        for (int i = 0; i < rows; i++) {
-            int position = offset + i;
-            if (position >= filtered.size()) break;
-            int y = listTop + i * ROW_H;
-            if (mouseX >= listLeft && mouseX < listRight && mouseY >= y && mouseY < y + ROW_H) {
-                hoverRow = i;
-                graphics.fill(listLeft - 2, y, listRight + 2, y + ROW_H - 1, 0x22FFFFFF);
-            }
-        }
-
-        super.render(graphics, mouseX, mouseY, partialTick);
-
-        for (int i = 0; i < rows; i++) {
-            int position = offset + i;
-            if (position >= filtered.size()) break;
-            drawRow(graphics, view.offers.get(filtered.get(position)), listTop + i * ROW_H);
-        }
-        if (filtered.isEmpty()) {
-            String empty = view.offers.isEmpty() ? "这家店暂时没有货物" : "没有匹配的物品";
-            graphics.drawString(font, empty, listLeft + 4, listTop + 8, 0xFF8A94A0, false);
-        }
-        drawScrollbar(graphics, rows);
-
-        if (!error.isEmpty()) {
-            graphics.drawString(font, font.plainSubstrByWidth(error, panelW / 2 - 48), left + 10, top + panelH - 19, 0xFF5555, false);
-        }
         if (hoverRow >= 0) {
             int position = offset + hoverRow;
             if (position < filtered.size()) {
-                MarketView.Line line = view.offers.get(filtered.get(position));
-                ItemStack stack = stackOf(line.item);
+                ItemStack stack = stackOf(view.offers.get(filtered.get(position)).item);
                 if (stack != null) {
-                    graphics.renderTooltip(font, stack, mouseX, mouseY);
+                    g.renderTooltip(font, stack, mouseX, mouseY);
                 }
             }
         }
     }
 
-    private void drawRow(GuiGraphics graphics, MarketView.Line line, int y) {
+    private void drawChrome(GuiGraphics g, int mouseX, int mouseY) {
+        Ui.frame(g, left, top, panelW, panelH);
+
+        Ui.rect(g, left + 1, top + 1, panelW - 2, HEADER_H - 1, Ui.PANEL_HEAD);
+        Ui.rect(g, left + 1, top + 1, 2, HEADER_H - 1, Ui.GOLD);
+        Ui.hline(g, left + 1, top + HEADER_H, panelW - 2, Ui.EDGE_SOFT);
+
+        String head = font.plainSubstrByWidth(title.getString(), panelW - 2 * PAD - CLOSE - 12);
+        g.drawString(font, head, left + PAD + 2, top + (HEADER_H - 8) / 2, Ui.TEXT, false);
+
+        boolean hovered = Ui.hit(mouseX, mouseY, closeX - 4, closeY - 4, CLOSE + 8, CLOSE + 8);
+        Ui.closeButton(g, closeX, closeY, CLOSE, hovered);
+
+        int bandY = footerY - GAP / 2;
+        Ui.rect(g, left + 1, bandY, panelW - 2, top + panelH - bandY - 1, Ui.PANEL_FOOT);
+        Ui.hline(g, left + 1, bandY, panelW - 2, Ui.EDGE_SOFT);
+    }
+
+    private void drawToolbar(GuiGraphics g, int mouseX, int mouseY) {
+        Ui.sunken(g, searchX, searchY, searchW, TOOLBAR_H);
+
+        String counter = filtered.size() + "/" + view.offers.size();
+        g.drawString(font, counter, searchX + searchW - 5 - font.width(counter), searchY + 5, Ui.TEXT_FAINT, false);
+        Ui.vline(g, searchX + searchW - 9 - font.width(counter), searchY + 4, TOOLBAR_H - 8, Ui.EDGE_SOFT);
+
+        boolean hovered = Ui.hit(mouseX, mouseY, chartX, searchY, CHART_W, TOOLBAR_H);
+        Ui.button(g, font, "行情", chartX, searchY, CHART_W, TOOLBAR_H, hovered, true,
+                Ui.BTN, Ui.BTN_HOVER, Ui.GOLD);
+    }
+
+    /** Draws the visible rows and returns the hovered row index (0-based on screen), or -1. */
+    private int drawList(GuiGraphics g, int mouseX, int mouseY) {
+        Ui.sunken(g, listLeft, listTop, listRight - listLeft, listBottom - listTop);
+
+        int hoverRow = -1;
+        if (filtered.isEmpty()) {
+            String empty = view.offers.isEmpty() ? "这家店暂时没有货物" : "没有匹配的物品";
+            g.drawString(font, empty, listLeft + (listRight - listLeft - font.width(empty)) / 2,
+                    listTop + (listBottom - listTop) / 2 - 4, Ui.TEXT_FAINT, false);
+            return -1;
+        }
+        for (int i = 0; i < rows; i++) {
+            int position = offset + i;
+            if (position >= filtered.size()) break;
+            int y = rowY(i);
+            boolean hovered = Ui.hit(mouseX, mouseY, listLeft, y, listRight - listLeft, ROW_H);
+            if (hovered) {
+                hoverRow = i;
+                Ui.rect(g, listLeft, y, listRight - listLeft, ROW_H - 1, Ui.ROW_HOVER);
+            } else if ((position & 1) == 1) {
+                Ui.rect(g, listLeft, y, listRight - listLeft, ROW_H - 1, Ui.ROW_ALT);
+            }
+            drawRow(g, view.offers.get(filtered.get(position)), y, mouseX, mouseY);
+            Ui.hline(g, listLeft, y + ROW_H - 1, listRight - listLeft, Ui.ROW_LINE);
+        }
+        drawScrollbar(g, mouseX, mouseY);
+        return hoverRow;
+    }
+
+    private void drawRow(GuiGraphics g, MarketView.Line line, int y, int mouseX, int mouseY) {
+        int textX = listLeft + 3 + ICON + 4;
+        int textW = buyX() - GAP - textX;
+
         ItemStack stack = stackOf(line.item);
         if (stack != null) {
-            graphics.renderItem(stack, listLeft, y + 4);
-            String name = stack.getHoverName().getString() + " x" + line.count;
-            graphics.drawString(font, font.plainSubstrByWidth(name, left + panelW - 210 - listLeft - 24),
-                    listLeft + 22, y + 3, 0xFFFFFF, false);
+            g.renderItem(stack, listLeft + 3, y + 3);
+            String name = stack.getHoverName().getString() + " ×" + line.count;
+            g.drawString(font, font.plainSubstrByWidth(name, textW), textX, y + 4, Ui.TEXT, false);
         } else {
-            graphics.drawString(font, line.item, listLeft + 22, y + 3, 0xFF5555, false);
+            g.drawString(font, font.plainSubstrByWidth(line.item, textW), textX, y + 4, Ui.UP, false);
         }
+
         String status = statusOf(line);
-        int color = line.locked || (line.limit >= 0 && line.used >= line.limit) ? 0xFFB48A4A : 0xFF9AA0AA;
-        graphics.drawString(font, font.plainSubstrByWidth(status, left + panelW - 210 - listLeft - 24),
-                listLeft + 22, y + 13, color, false);
+        int statusColor = line.locked || (line.limit >= 0 && line.used >= line.limit) ? 0xFFB48A4A : Ui.TEXT_DIM;
+        g.drawString(font, font.plainSubstrByWidth(status, textW), textX, y + 13, statusColor, false);
+
+        int by = y + (ROW_H - 1 - BTN_H) / 2;
+        boolean hoverBuy = Ui.hit(mouseX, mouseY, buyX(), by, BTN_W, BTN_H);
+        boolean hoverSell = Ui.hit(mouseX, mouseY, sellX(), by, BTN_W, BTN_H);
+
+        if (line.buy > 0) {
+            Ui.button(g, font, "买 " + line.buy, buyX(), by, BTN_W, BTN_H,
+                    hoverBuy && !pending && canBuy(line), !pending && canBuy(line),
+                    Ui.BUY, Ui.BUY_HOVER, Ui.TEXT);
+        }
+        if (line.sell > 0) {
+            Ui.button(g, font, "卖 " + line.sell, sellX(), by, BTN_W, BTN_H,
+                    hoverSell && !pending && canSell(line), !pending && canSell(line),
+                    Ui.SELL, Ui.SELL_HOVER, Ui.TEXT);
+        }
     }
 
     private static String statusOf(MarketView.Line line) {
@@ -307,13 +372,24 @@ public final class MarketScreen extends Screen {
         }
     }
 
-    private void drawClose(GuiGraphics graphics, int mouseX, int mouseY) {
-        int x = left + panelW - 22;
-        int y = top + 7;
-        GuiArt.icon(graphics, GuiArt.CLOSE, x, y);
-        if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
-            graphics.fill(x, y, x + 16, y + 16, 0x55FFFFFF);
-        }
+    private void drawFooter(GuiGraphics g) {
+        int y = footerY + 5;
+        String label = "余额 ";
+        String balance = view.balance + " spur";
+        g.drawString(font, label, contentLeft, y, Ui.TEXT_FAINT, false);
+        g.drawString(font, balance, contentLeft + font.width(label), y, Ui.GOLD, false);
+
+        int x = contentLeft + font.width(label + balance) + 10;
+        StringBuilder rep = new StringBuilder();
+        if (view.faction != null && !view.faction.isEmpty()) rep.append(view.faction).append(' ');
+        rep.append(view.reputation);
+        if (view.title != null && !view.title.isEmpty()) rep.append(" · ").append(view.title);
+        g.drawString(font, font.plainSubstrByWidth(rep.toString(), panelW / 2 - 40), x, y, Ui.TEXT_DIM, false);
+
+        boolean hasError = !error.isEmpty();
+        String right = hasError ? error : "滚轮翻页 · Ctrl+F 搜索";
+        right = font.plainSubstrByWidth(right, panelW / 2 - 20);
+        g.drawString(font, right, contentRight - font.width(right), y, hasError ? Ui.UP : Ui.TEXT_FAINT, false);
     }
 
     // ---------------------------------------------------------------- scrollbar
@@ -322,39 +398,38 @@ public final class MarketScreen extends Screen {
         return listBottom - listTop;
     }
 
-    private int thumbHeight(int rows) {
+    private int thumbHeight() {
         int track = trackHeight();
         if (filtered.size() <= rows || filtered.isEmpty()) return track;
-        return Math.max(16, (int) Math.round(track * (double) rows / filtered.size()));
+        return Math.max(12, (int) Math.round(track * (double) rows / filtered.size()));
     }
 
-    private int thumbY(int rows) {
+    private int thumbY() {
         int track = trackHeight();
-        int height = thumbHeight(rows);
+        int height = thumbHeight();
         int span = Math.max(1, track - height);
         int max = maxOffset();
         if (max <= 0) return listTop;
         return listTop + (int) Math.round(span * (offset / (double) max));
     }
 
-    private void drawScrollbar(GuiGraphics graphics, int rows) {
-        GuiArt.scrollTrack(graphics, trackX, listTop, SCROLL_W, trackHeight());
-        if (filtered.size() <= rows) return;
-        GuiArt.scrollHandle(graphics, trackX, thumbY(rows), SCROLL_W, thumbHeight(rows));
+    private void drawScrollbar(GuiGraphics g, int mouseX, int mouseY) {
+        boolean hovered = Ui.hit(mouseX, mouseY, trackX - 1, listTop, TRACK_W + 2, trackHeight());
+        Ui.scrollbar(g, trackX, listTop, TRACK_W, trackHeight(), thumbY(), thumbHeight(),
+                hovered || dragging);
     }
 
     private boolean insideTrack(double mouseX, double mouseY) {
-        return mouseX >= trackX - 2 && mouseX < trackX + SCROLL_W + 2
+        return mouseX >= trackX - 2 && mouseX < trackX + TRACK_W + 2
                 && mouseY >= listTop && mouseY <= listBottom;
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (mouseX >= left && mouseX < left + panelW && mouseY >= top && mouseY < top + panelH
+        if (Ui.hit(mouseX, mouseY, listLeft, listTop, listRight - listLeft, listBottom - listTop)
                 && maxOffset() > 0) {
-            int step = Math.max(1, (int) Math.round(delta));
-            offset = Math.max(0, Math.min(maxOffset(), offset - step));
-            rebuildRows();
+            int step = delta > 0 ? -1 : 1;
+            offset = Math.max(0, Math.min(maxOffset(), offset + step));
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, delta);
@@ -362,24 +437,40 @@ public final class MarketScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0) {
-            if (mouseX >= left + panelW - 22 && mouseX < left + panelW - 6
-                    && mouseY >= top + 7 && mouseY < top + 23) {
-                onClose();
+        if (button != 0) return super.mouseClicked(mouseX, mouseY, button);
+
+        if (Ui.hit(mouseX, mouseY, closeX - 4, closeY - 4, CLOSE + 8, CLOSE + 8)) {
+            onClose();
+            return true;
+        }
+        if (Ui.hit(mouseX, mouseY, chartX, searchY, CHART_W, TOOLBAR_H)) {
+            openChart();
+            return true;
+        }
+        if (insideTrack(mouseX, mouseY) && maxOffset() > 0) {
+            int thumb = thumbY();
+            int height = thumbHeight();
+            if (mouseY >= thumb && mouseY < thumb + height) {
+                dragging = true;
+                dragGrab = mouseY - thumb;
+            } else {
+                int span = Math.max(1, trackHeight() - height);
+                double ratio = (mouseY - listTop - height / 2.0D) / span;
+                offset = (int) Math.round(Math.max(0, Math.min(1, ratio)) * maxOffset());
+            }
+            return true;
+        }
+        for (int i = 0; i < rows; i++) {
+            int position = offset + i;
+            if (position >= filtered.size()) break;
+            int by = rowY(i) + (ROW_H - 1 - BTN_H) / 2;
+            MarketView.Line line = view.offers.get(filtered.get(position));
+            if (Ui.hit(mouseX, mouseY, buyX(), by, BTN_W, BTN_H)) {
+                if (canBuy(line)) send(filtered.get(position), BUY);
                 return true;
             }
-            if (insideTrack(mouseX, mouseY) && maxOffset() > 0) {
-                int rows = visibleRows();
-                int thumb = thumbY(rows);
-                if (mouseY >= thumb && mouseY < thumb + thumbHeight(rows)) {
-                    dragging = true;
-                    dragGrab = mouseY - thumb;
-                } else {
-                    int span = Math.max(1, trackHeight() - thumbHeight(rows));
-                    double ratio = (mouseY - listTop - thumbHeight(rows) / 2.0D) / span;
-                    offset = (int) Math.round(Math.max(0, Math.min(1, ratio)) * maxOffset());
-                    rebuildRows();
-                }
+            if (Ui.hit(mouseX, mouseY, sellX(), by, BTN_W, BTN_H)) {
+                if (canSell(line)) send(filtered.get(position), SELL);
                 return true;
             }
         }
@@ -389,11 +480,9 @@ public final class MarketScreen extends Screen {
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (dragging && button == 0) {
-            int rows = visibleRows();
-            int span = Math.max(1, trackHeight() - thumbHeight(rows));
+            int span = Math.max(1, trackHeight() - thumbHeight());
             double ratio = (mouseY - listTop - dragGrab) / span;
             offset = (int) Math.round(Math.max(0, Math.min(1, ratio)) * maxOffset());
-            rebuildRows();
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
