@@ -5,6 +5,7 @@ import com.society.sunlitmarket.SunlitMarketMod;
 import com.society.sunlitmarket.alignment.FactionRelations;
 import com.society.sunlitmarket.market.MarketRegistry;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
@@ -61,12 +62,16 @@ public final class MarketRules {
                     || number(o,"marketValue",number(o,"baseValue",0))<1 || number(o,"askPrice",number(o,"baseValue",0))<1)
                 throw new IllegalArgumentException("Invalid pool");
         }
-        if(type.equals("npc") && (text(o,"faction").isBlank() || (text(o,"tag").isBlank()&&text(o,"npcType").isBlank())))
+        if(type.equals("npc") && (text(o,"faction").isBlank() || (text(o,"tag").isBlank()&&text(o,"npcType").isBlank()
+                &&text(o,"entity").isBlank()&&text(o,"profession").isBlank())))
             throw new IllegalArgumentException("NPC selector and faction required");
         if(type.equals("law") && (text(o,"item").isBlank()&&text(o,"tag").isBlank())) throw new IllegalArgumentException("Law selector required");
         if(type.equals("law") && (number(o,"tier",1)<1 || number(o,"tier",1)>4)) throw new IllegalArgumentException("Law tier must be 1..4");
-        for (String key : new String[]{"item","dimension","faction"}) if (!text(o,key).isBlank() && ResourceLocation.tryParse(text(o,key)) == null)
+        for (String key : new String[]{"item","dimension","faction","entity"}) if (!text(o,key).isBlank()
+                && ResourceLocation.tryParse(key.equals("entity")?normalizeId(text(o,key)):text(o,key)) == null)
             throw new IllegalArgumentException("Invalid resource id: " + key);
+        if(!text(o,"profession").isBlank() && ResourceLocation.tryParse(normalizeId(text(o,"profession"))) == null)
+            throw new IllegalArgumentException("Invalid profession id");
         if(type.equals("law") && !text(o,"tag").isBlank() && ResourceLocation.tryParse(text(o,"tag")) == null)
             throw new IllegalArgumentException("Invalid law tag");
         if(type.equals("pool")) {
@@ -87,16 +92,30 @@ public final class MarketRules {
         String type=MarketRegistry.readNpcType(entity);
         var nativeIdentity=FactionRelations.identity(type);
         Identity result=new Identity(nativeIdentity.faction(),nativeIdentity.rank(),false);
-        for(JsonObject o:all()) if(text(o,"type").equals("npc")
-                && (!text(o,"tag").isBlank()&&entity.getTags().contains(text(o,"tag"))
-                || !text(o,"npcType").isBlank()&&text(o,"npcType").equals(type)))
+        for(JsonObject o:all()) if(text(o,"type").equals("npc")&&matchesNpc(o,entity,type))
             result=new Identity(text(o,"faction"),text(o,"rank"),o.has("enforcer")&&o.get("enforcer").getAsBoolean());
         return result;
     }
+    private static String entityId(Entity entity){return net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();}
+    private static String professionId(Entity entity){
+        return entity instanceof Villager villager
+                ? net.minecraft.core.registries.BuiltInRegistries.VILLAGER_PROFESSION.getKey(villager.getVillagerData().getProfession()).toString() : "";
+    }
+    private static String normalizeId(String value){return value.indexOf(':')<0?"minecraft:"+value:value;}
+    private static boolean matchesNpc(JsonObject o,Entity entity,String npcType){
+        String tag=text(o,"tag"),type=text(o,"npcType"),kind=text(o,"entity"),profession=text(o,"profession");
+        boolean selector=false,matched=false;
+        if(!tag.isBlank()){selector=true;matched|=entity.getTags().contains(tag);}
+        if(!type.isBlank()){selector=true;matched|=type.equals(npcType);}
+        if(!kind.isBlank()){selector=true;matched|=normalizeId(kind).equals(entityId(entity));}
+        if(selector&&!matched)return false;
+        if(!profession.isBlank()&&!normalizeId(profession).equals(professionId(entity)))return false;
+        return selector||!profession.isBlank();
+    }
     public static boolean inJurisdiction(Entity npc, Entity target) {
         String npcType=MarketRegistry.readNpcType(npc);
-        for(JsonObject o:all()) if(text(o,"type").equals("npc") && o.has("enforcer") && o.get("enforcer").getAsBoolean()
-                && (!text(o,"tag").isBlank()&&npc.getTags().contains(text(o,"tag")) || !text(o,"npcType").isBlank()&&text(o,"npcType").equals(npcType))) {
+        for(JsonObject o:all())             if(text(o,"type").equals("npc") && o.has("enforcer") && o.get("enforcer").getAsBoolean()
+                && matchesNpc(o,npc,npcType)) {
             String dimension=text(o,"dimension");
             if(dimension.isBlank() || !dimension.equals(target.level().dimension().location().toString())) continue;
             if(o.has("x")&&o.has("z")) {
