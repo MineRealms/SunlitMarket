@@ -13,6 +13,9 @@ Sunlit Market 是给 Sunlit Valley 整合包写的 NPC 交易/声望附属 mod�
 - JSON + KubeJS 双层配置
 - 当前状态：**MVP + P1 完成（限购/声望价/解锁门槛/季节曲线）；dev 自检 24/24 通过；
   已部署到主客户端 / -DEV / mirror；未上传服务器 mod；未完成 ME NPC 与 Numismatics 实机经济测试**
+- 当铺核心层（S2–S6：FTB 可选队伍、柜台顾客、赃物/通缉、执法、脚本事件）已在 `core-implementation` 分支实现，
+  设计/行为见 `docs/CORE.md`。**22 个单测 + 22 项 -DEV 集成断言通过**（`TESTING.md` 第 8 节）；
+  FTB 真实双人队伍、Numismatics 银行、柜台/商人 GUI 视觉仍未验证（GUI 由用户亲自打开，勿用 Rosetta 操作界面）。
 
 ## 2. 当前构建 / 部署
 
@@ -188,6 +191,15 @@ Select-String -Path 'H:\MinecraftMods\SunlitMarket\run-client\logs\latest.log' `
 - 手工命令：`/sunlitmarket open <id>`、`/sunlitmarket rep <faction> <v>`、`/sunlitmarket balance`、
   `/sunlitmarket unlock <id> [off]`、`/sunlitmarket locks`、`/sunlitmarket debug <id>`
   （`debug` 把服务端视图 JSON 打到聊天和 latest.log，是最省事的验收手段）
+
+### 当铺核心自检
+
+```mcfunction
+execute as @p run sunlitmarket selftest
+```
+
+仅在隔离开发世界运行；会临时占用背包和头顶两格空气位置，结束后恢复。覆盖交易方向/负结盟/满背包、
+库存限购迁移、柜台请求/还价/过期、赃物/没收/罚金。不要在生产世界执行。
 
 ### 生产/ME 测试
 

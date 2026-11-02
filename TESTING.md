@@ -195,3 +195,45 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - 命令参数 `faction` 必须用 `ResourceLocationArgument`；`StringArgumentType.string()` 不接受 `:`，
   会报「参数后应有空格分隔」。
 - 强杀客户端会丢失未保存的 `AlignmentData`。测完先 `save-all` 再关。
+
+---
+
+## 8. Core 收尾验证（2026-11-02，-DEV 实例）
+
+构建 `sunlitmarket-1.20.1-0.1.0.jar`（185,512 B，sha256 前缀 `1f36cd80`），仅部署到 -DEV；主实例 / mirror 未覆盖。
+
+### 8.1 纯单元测试
+
+`gradle --no-daemon test build`：**22 个测试通过**（Offer 5、OwnerKey 4、StockData 2、TradeMath 9、ReloadStaging 2）。
+新增覆盖：显式 `legacyIndex` 迁移不会补满库存、已有 ID 值不被旧索引覆盖、暂存价格/币值在提交前不可见且失败时保留旧快照。
+
+### 8.2 实机集成自检
+
+`execute as @p run sunlitmarket selftest` → **PASS 22 integration assertions**：
+
+- 交易：负结盟值交易、禁用方向拒绝、无效数量不改余额、满背包失败后余额不变、同报价不倒挂、结盟值序列化。
+- 迁移：`legacyIndex` 把 `stock=6, used=2` 搬到新 ID 键；成交后 `stock=5, used=3`，未回满。
+- 柜台：CIVILIAN 身份、请求生成、收购结算、重复请求拒绝、成交结盟、还价失败不变量、过期请求拒绝。
+- 执法：漏斗面禁用、热度衰减/清除、按来源没收、柜台内赃物没收并扣罚金 2。
+
+### 8.3 KubeJS 热重载边界（真实 `/reload`）
+
+临时脚本同时设置 `priceMultiplier(me_shire_farmer, me:leek, 2.0)` 与 `coinValue(reloadtest:coin, 123)`；每次执行完整 `reload` 命令。
+
+| 场景 | 日志 | 观察值 |
+|---|---|---|
+| 有效脚本 | `Loaded 6/6 ... 0 errors` | leek 买价 13→27，币值 123 |
+| 脚本语法错误 | `Loaded 5/6 ... 1 errors` + `EvaluatorException` | **保持 27 / 123**（旧快照不被清空） |
+| 删除脚本后再 reload | `Loaded 5/5 ... 0 errors` | 回到 13 / 0（旧脚本效果被移除） |
+
+过程中修掉两个实际缺陷：
+
+1. KubeJS 语法错误**不一定**进入 `console.errors`；现改用 `ScriptFileInfo.lines` 是否残留判断整批脚本成功，失败时整批保留旧快照。
+2. `PriceModifiers` / `Currency` 原先读取也会命中暂存表；现改为「写暂存、读已提交」，提交前运行时不发生变化。
+
+### 8.4 未验证 / 人工验收
+
+- 柜台 GUI、商人 GUI 的视觉与点击流程：**由用户亲自打开**，本会话不再通过 Rosetta 操作 UI。
+- FTB Teams 真实双人共享/退队/解散；当前无 FTB 运行环境。
+- Numismatics 银行/找零：-DEV 未安装该 mod。
+- 保存退出重进后的完整 GUI 行为；SavedData 的序列化已由单测与自检覆盖。
