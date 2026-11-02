@@ -22,6 +22,7 @@ public final class SunlitMarketPlugin extends KubeJSPlugin {
         com.society.sunlitmarket.core.MarketRules.beginScripts();
         com.society.sunlitmarket.market.PriceModifiers.beginScripts();
         com.society.sunlitmarket.currency.Currency.beginScripts();
+        com.society.sunlitmarket.futures.FuturesSpecs.beginScripts();
         event.add("SunlitMarket", new SunlitMarketBinding());
     }
 
@@ -47,6 +48,7 @@ public final class SunlitMarketPlugin extends KubeJSPlugin {
             com.society.sunlitmarket.core.MarketRules.endScripts(valid);
             com.society.sunlitmarket.market.PriceModifiers.endScripts(valid);
             com.society.sunlitmarket.currency.Currency.endScripts(valid);
+            com.society.sunlitmarket.futures.FuturesSpecs.endScripts(valid);
             MarketRegistry.loadJson();
             com.society.sunlitmarket.core.MarketRules.loadJson();
             com.society.sunlitmarket.config.SunlitMarketConfig.invalidate();

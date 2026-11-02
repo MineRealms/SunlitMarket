@@ -26,6 +26,9 @@ public final class CoreEvents {
     public static void register(IEventBus modBus){
         modBus.addListener(CoreEvents::config);
         MinecraftForge.EVENT_BUS.addListener(CoreCommands::register);
+        MinecraftForge.EVENT_BUS.addListener(com.society.sunlitmarket.futures.FuturesCommands::register);
+        MinecraftForge.EVENT_BUS.addListener(CoreEvents::login);
+        com.society.sunlitmarket.market.MarketExport.register("futures-history.json", com.society.sunlitmarket.futures.FuturesService::history);
         MinecraftForge.EVENT_BUS.addListener(CoreEvents::reload);
         MinecraftForge.EVENT_BUS.addListener(CoreEvents::tick);
         MinecraftForge.EVENT_BUS.addListener(CoreEvents::breakBlock);
@@ -43,11 +46,11 @@ public final class CoreEvents {
         e.addListener(new SimplePreparableReloadListener<Void>(){
             @Override protected Void prepare(ResourceManager r,ProfilerFiller p){return null;}
             @Override protected void apply(Void ignored,ResourceManager r,ProfilerFiller p){
-                SunlitMarketConfig.invalidate();FactionRelations.reload(r);MarketRegistry.loadJson();MarketRules.loadJson();MarketRegistry.changed();
+                SunlitMarketConfig.invalidate();FactionRelations.reload(r);MarketRegistry.loadJson();MarketRules.loadJson();com.society.sunlitmarket.futures.FuturesSpecs.loadJson();MarketRegistry.changed();
             }
         });
     }
-    private static void tick(TickEvent.ServerTickEvent e){if(e.phase==TickEvent.Phase.END){CrimeService.tick(e.getServer());com.society.sunlitmarket.audit.EconomyAudit.tick(e.getServer());com.society.sunlitmarket.treasury.Treasury.tick(e.getServer());}}
+    private static void tick(TickEvent.ServerTickEvent e){if(e.phase==TickEvent.Phase.END){CrimeService.tick(e.getServer());com.society.sunlitmarket.audit.EconomyAudit.tick(e.getServer());com.society.sunlitmarket.treasury.Treasury.tick(e.getServer());com.society.sunlitmarket.futures.FuturesService.tick(e.getServer());}}
     private static void breakBlock(BlockEvent.BreakEvent e){
         if(e.getLevel().getBlockEntity(e.getPos()) instanceof CounterBlockEntity be&&!be.access(e.getPlayer())&&!e.getPlayer().hasPermissions(2))e.setCanceled(true);
     }
@@ -60,6 +63,13 @@ public final class CoreEvents {
         for(String friendly:FactionRelations.hostilesOf(identity.faction())) {
             int reward=(int)Math.floor(CoreConfig.ENEMY_KILL_GAIN.get()*FactionRelations.regionWeight(friendly,e.getEntity()));
             if(reward>0)alignment.add(p,friendly,reward);
+        }
+    }
+    /** Futures settled while a player was offline are paid on their next login. */
+    private static void login(PlayerEvent.PlayerLoggedInEvent e){
+        if(e.getEntity() instanceof net.minecraft.server.level.ServerPlayer p){
+            String line=com.society.sunlitmarket.futures.FuturesService.deliver(p);
+            if(!line.isEmpty())p.sendSystemMessage(net.minecraft.network.chat.Component.literal("[期货] "+line));
         }
     }
     private static void logout(PlayerEvent.PlayerLoggedOutEvent e){if(e.getEntity() instanceof net.minecraft.server.level.ServerPlayer p)TradeSessions.close(p);}

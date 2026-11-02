@@ -483,6 +483,36 @@ public final class SunlitMarketBinding {
         return 0L;
     }
 
+    /**
+     * Opens futures on an index: {index, multiplier, tenorDays, band, feeBps, maxLots, minTraders,
+     * minBuckets, windowTicks, unlock}; everything but index has a default.
+     */
+    public boolean futures(Object spec) {
+        try {
+            com.society.sunlitmarket.futures.FuturesSpecs.add(toJson(spec));
+            return true;
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.futures rejected", t);
+        }
+        return false;
+    }
+
+    /** Drops every script futures spec; existing offers and contracts keep their terms. */
+    public void clearFutures() {
+        com.society.sunlitmarket.futures.FuturesSpecs.clearScripts();
+    }
+
+    /** Read-only order book for one index (or all when blank) as JSON. */
+    public String futuresJson(String index) {
+        try {
+            var server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+            return server == null ? "{}" : com.society.sunlitmarket.futures.FuturesService.book(server, index).toString();
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.futuresJson failed", t);
+        }
+        return "{}";
+    }
+
     /** How many of an item id the player carries (scripts, quest checks). */
     public int countItems(Player player, String itemId) {
         try {

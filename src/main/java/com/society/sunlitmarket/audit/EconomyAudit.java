@@ -143,6 +143,8 @@ public final class EconomyAudit {
             JsonObject treasury = com.society.sunlitmarket.treasury.Treasury.status(server);
             o.add("C", treasury.get("C")); o.add("R", treasury.get("R")); o.add("burned", treasury.get("burned"));
             o.add("treasury", treasury);
+            JsonObject futures = com.society.sunlitmarket.futures.FuturesService.status(server);
+            o.add("E", futures.get("escrow")); o.add("futuresClaims", futures.get("claims"));
         } catch (RuntimeException ex) { o.addProperty("C", "UNAVAILABLE"); o.addProperty("R", "UNAVAILABLE"); }
         return o.toString();
     }
