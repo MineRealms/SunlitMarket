@@ -295,9 +295,9 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 
 - 方块 + 方块实体 + 菜单 + 估值全部在 `deposit` 包（不引用任何 `net.minecraft.client.*`），只有 `client/DepositBinScreen` 是客户端类。
 - 五路入口：物品 `IItemHandler`（1 格）、流体 `IFluidHandler`（8000 mB）、FE `IEnergyStorage`（2M）、TC4R 源质 `EssentiaCapabilities.TRANSPORT`（128 点）、Botania 魔力 `MANA_RECEIVER`（1M）。
-- 物品价格直接取当铺自己的收购表（`Offer.sell / count` 取各商人最大值），没有第二份定价。未在货单里的物品（例如金锭）价值为 0，拒绝支付而不是给个随手价。
-- 其余四路是固定低汇率：流体 1–10 spur/桶（汽油 10、柴油 8、油 6、硫酸 3，其余 1）；FE 每 5 万换 1；源质每点 1；魔力每 2000 换 1。电给得最差是刻意的——GT 的电力没有产能上限，任何有意义的电价都是印钞机。
-- `collect()` 先 `Currency.settle` 入账，成功后才清空五路存储；付款失败时物品不会被销毁。
+- 物品价格默认取当铺自己的收购表（`Offer.sell / count` 取各商人最大值），没有第二份定价。未在货单里的物品（例如金锭）价值为 0，拒绝支付而不是给个随手价；`deposit_values.json` 的 `items` 可以逐物品覆盖（见 §14）。
+- 其余四路默认低汇率：流体 1–10 spur/桶（汽油 10、柴油 8、油 6、硫酸 3，其余 1）；FE 每 5 万换 1；源质每点 1；魔力每 2000 换 1。电给得最差是刻意的——GT 的电力没有产能上限，任何有意义的电价都是印钞机。这些数字现在全在配置文件里（§14）。
+- `collect()` 先把金额记入虚拟钱包，成功后才清空五路存储；`wallet.enabled=false` 时回落到 `Currency.settle`，付款失败（背包满）时物品不会被销毁。
 - 可选模组在运行期才解析：TC4R 用 `libs/` 里的 20748 api jar 编译（与客户端版本一致），只在 `ModList.isLoaded("thaumcraft")` 分支里实例化；Botania 用动态代理，不引入 12 MB 编译依赖，缺模组时不会 NoClassDefFoundError。
 - 状态同步：`DepositStateMessage`(S2C id 8) 每 10 tick 与打开时下发；「回收」按钮走 `clickMenuButton(0)`，没有额外的 C2S 包。协议版本从 2 提到 3。
 - 贴图由 GTCEu 机壳拼合（`machine_casing_solid_steel` + `machine_casing_gearbox_steel`），生成脚本在 `build/gen_textures.py`，输出 `deposit_bin_{top,side,front}.png`。
@@ -305,3 +305,18 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - DEV 实测证据（2026-11-02 22:34）：把漏斗放在接受仓上方，`item replace` 灌 4 个金锭 → 漏斗清空、`data get block` 显示 `Items:[{Slot:0,id:"minecraft:gold_ingot",Count:4}]`，证明 `IItemHandler` 能力确实挂上了；估值函数实测 `4 铁锭=120 / 10 粗铁=90 / 8 桶柴油=64 / 2M FE=40 / 128 源质=128 / 1M 魔力=500`。
 - 观察点：右键（空手/潜行）开界面，界面显示五路存量与各自折算值，底部「合计 N spur」+「回收」按钮；手持物品右键直接放入（不进界面）。
 - 已知限制：还没有每日回收预算（`ECONOMY_MODEL_V2.md` §7 的 `BuybackBudgetManager`），现在只要塞满就能换钱；源质/魔力的汇率尚未经过实测调参。
+
+## 14. 价格表配置化 + 虚拟钱包（2026-11-02，-DEV 实例实测）
+
+- `config/sunlitmarket/deposit_values.json` 首次启动自动生成默认值，字段：`accept.{item,fluid,energy,essentia,mana}`、`items`、`fluids.default` + 逐流体、`energy.fePerSpur`、`essentia.pointsPerSpur` + `essentia.aspects`、`mana.manaPerSpur`、`wallet.{enabled,exchangeFeePercent,minWithdraw}`。
+- 取值优先级：配置 > 当铺收购表 > 0。实测 `iron=30`（配置未覆盖，来自当铺表）、`gold=0`（DEV 没有商人收金锭）、`water=1`（走 `fluids.default`）、`diesel=8`。
+- KubeJS 覆盖实测（桥接直接调 `SunlitMarketBinding`）：`depositPrice("minecraft:gold_ingot",250)` → `itemUnit=250`；`depositFluidRate("minecraft:water",3)` → 8000 mB = 24 spur；`depositAccept("mana",false)` → `manaValue(1e6)=0`。之后 `dirty=true`，下一个保存点写盘（日志 `deposit_values.json updated by script`），文件里出现 `"minecraft:gold_ingot": 250` / `"minecraft:water": 3` / `"mana": false`。
+- 重启后 `_devprobe.js` 读到 `gold price=250`（上一次脚本覆盖的持久化结果）与 `iron price=999`（本次脚本设定）：「脚本 → 配置 → 磁盘 → 重启 → 生效」整条链路通了。
+- 钱包存在 ForgeData 的 `sunlitmarket.wallet`（long），跨死亡/换维度/重载都不丢。`Currency.balance()` = 现金/银行 + 钱包，`cashBalance()` 只算现金/银行。
+- 扣款规则：钱包能**整笔**覆盖才用钱包，否则完全回落到硬币/银行，不做跨后端拆分。实测 `pay(500)` 钱包 1044→544 而现金 960 不动；`pay(900)` 钱包不够整笔 → 硬币 960→60。
+- 兑换实测（`/execute as @p run sunlitmarket wallet ...`）：`wallet=2044 cash=10` → `withdraw 1000` → 钱包 −1000、取出 950（5% 手续费）→ `wallet=1044 cash=960`，`/sunlitmarket balance` = 2004（总量少 50，手续费直接销毁不铸币）。
+- 接受仓回收实测：铁锭 1 个（脚本价 999）→ `回收 +999 → 钱包 2044`，`value()` 归零；证明「先入账再清空」的顺序。
+- 踩到的坑：`WalletExchange.deposit` 原来用 `Currency.pay`，钱包一接入就变成「钱包给自己充值」再烧手续费，凭空销毁货币。已拆出 `Currency.payCash`（`settle(..., useWallet=false)`）只走现金。
+- GUI：五行入口下多了一条钱包带（余额 / 手续费 / 最低取出 + 存入、取出按钮），按钮走 `clickMenuButton(1|2)`，不需要额外 C2S 包。**排版未做界面验收**，需要人工开一次看。
+- 未验证：`wallet.enabled=false` 时接受仓回落 `Currency.settle` 的路径（代码有分支，DEV 没跑）。
+- 已知瑕疵：小额兑换会被整数除法吃掉手续费（10 spur 存进去仍是 10，5% 取整为 0），只有 ≥20 spur 才真正扣到 1。
