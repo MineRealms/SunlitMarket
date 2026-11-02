@@ -5,30 +5,31 @@
 // ============================================================
 console.info("[ME-INTEGRATION] meTrades.js loaded (shipping bin)");
 
-const ME_LOADED = Platform.isLoaded("me");
-const TRADES_READY = typeof global.trades !== "undefined";
+let ME_LOADED = Platform.isLoaded("me");
+let ME_TRADES_READY = typeof global.trades !== "undefined";
 if (!ME_LOADED) {
   console.info("[ME-INTEGRATION] meTrades.js skipped: Middle-earth not installed");
-} else if (!TRADES_READY) {
+} else if (!ME_TRADES_READY) {
   console.info("[ME-INTEGRATION] meTrades.js skipped: global.trades missing (globalRegistry.js not loaded)");
 }
 
-const CROP = "shippingbin:crop_sell_multiplier";
-const ARTISAN = "shippingbin:crop_sell_multiplier";
+let ME_CROP = "shippingbin:crop_sell_multiplier";
+let ME_ARTISAN = "shippingbin:crop_sell_multiplier";
 
-const addMeTrades = (kind, multiplier, entries) => {
-  if (!ME_LOADED || !TRADES_READY) return;
-  entries.forEach(([id, value]) => {
-    global.trades.set("me:" + id, {
-      value: global.getConfiguredValue(value, kind),
+let addMeTrades = (kind, multiplier, entries) => {
+  if (!ME_LOADED || !ME_TRADES_READY) return;
+  for (let i = 0; i < entries.length; i++) {
+    let entry = entries[i];
+    global.trades.set("me:" + entry[0], {
+      value: global.getConfiguredValue(entry[1], kind),
       multiplier: multiplier,
     });
-  });
+  }
 };
 
 // Raw produce. Kept below the pack's expensive specialty crops; quality
 // bonuses are applied by the shipping bin and merchant GUI separately.
-addMeTrades("crop", CROP, [
+addMeTrades("crop", ME_CROP, [
   ["leek", 10], ["cucumber", 12], ["lettuce", 10], ["garlic", 14],
   ["tomato", 12], ["bell_pepper", 14], ["onion", 10],
   ["strawberry", 12], ["strawberries", 12],
@@ -39,7 +40,7 @@ addMeTrades("crop", CROP, [
 
 // Prepared dishes; the recipe and GTMFO values live in meCooking.js and
 // gtmfoNutrients.js. These are shipping-bin values only.
-addMeTrades("artisan", ARTISAN, [
+addMeTrades("artisan", ME_ARTISAN, [
   ["vegetable_soup", 55], ["berry_pie", 48], ["fish_stew", 65],
   ["crab_soup", 65], ["poultry_meal", 60], ["meat_bowl", 72],
   ["meat_egg_meal", 70], ["vegetable_skewer", 18], ["cooked_vegetable_skewer", 36],

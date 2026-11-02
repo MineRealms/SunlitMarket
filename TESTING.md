@@ -251,3 +251,5 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - `gradle --no-daemon test build` 通过，生成 jar 并同步主客户端 / -DEV / mirror（sha256 前缀 `68b67749`）。
 
 待服务器验收：实际实体职业名、物品 ID、货池生成、柜台 UI、ME 商人收购条目、mastery 阶段同步。
+
+启动时曾出现 `TypeError: redeclaration of const CROP`：`meTrades.js` 的 `const CROP` 与 `tfTrades.js` 同名，KubeJS startup 脚本共享作用域且会重复求值。现已改为唯一的 `let ME_CROP` / `ME_ARTISAN`，并去掉箭头参数数组解构；主客户端启动脚本恢复为 104/104、0 errors。
