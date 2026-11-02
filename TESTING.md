@@ -248,8 +248,10 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - `svCustomers.js` / `svMeCustomers.js` / `svMastery.js` / `meMerchants.js`：`node --check` 全通过。
 - Node 静态执行（完整价格数组）：646 条规则 / 631 个货池 / 15 条 NPC 规则；0 重复、0 个 `askPrice >= marketValue`；bread 22/14。
 - FTBQ 重点商品覆盖：crops 89/89、fishing 75/75、pantry 12/12、minerals 44/44；AS/TC/BOT 材料 19 条；GT/机器/收藏品未作为顾客商品。
-- `gradle --no-daemon test build` 通过，生成 jar 并同步主客户端 / -DEV / mirror（sha256 前缀 `68b67749`）。
+- `gradle --no-daemon test build` 通过，生成 jar 并同步主客户端 / -DEV / mirror（sha256 前缀 `346db8b5`）。
 
 待服务器验收：实际实体职业名、物品 ID、货池生成、柜台 UI、ME 商人收购条目、mastery 阶段同步。
 
 启动时曾出现 `TypeError: redeclaration of const CROP`：`meTrades.js` 的 `const CROP` 与 `tfTrades.js` 同名，KubeJS startup 脚本共享作用域且会重复求值。现已改为唯一的 `let ME_CROP` / `ME_ARTISAN`，并去掉箭头参数数组解构；主客户端启动脚本恢复为 104/104、0 errors。
+
+专用服务端曾崩溃于 `NoClassDefFoundError: net/minecraft/client/gui/screens/Screen`：`AlignmentMessage` 在 common setup 类加载时直接引用客户端 `Minecraft`/`AlignmentScreen`。现已新增 `client/ClientPacketHandlers`，四个 S2C 包只引用该客户端处理器；扫描 jar 后确认 `net/minecraft/client` 只出现在 `client` 包。服务端 jar sha256 前缀 `346db8b5`，待服务器重启验收。

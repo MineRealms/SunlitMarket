@@ -19,7 +19,7 @@ public record OpenMarketMessage(String json) {
 
     public static void handle(OpenMarketMessage msg, Supplier<NetworkEvent.Context> ctx) {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                () -> () -> com.society.sunlitmarket.client.MarketClient.open(msg.json()));
+                () -> () -> com.society.sunlitmarket.client.ClientPacketHandlers.openMarket(msg.json()));
         ctx.get().setPacketHandled(true);
     }
 }

@@ -19,7 +19,7 @@ public record MarketUpdateMessage(String json, String error) {
 
     public static void handle(MarketUpdateMessage msg, Supplier<NetworkEvent.Context> ctx) {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                () -> () -> com.society.sunlitmarket.client.MarketClient.update(msg.json(), msg.error()));
+                () -> () -> com.society.sunlitmarket.client.ClientPacketHandlers.updateMarket(msg.json(), msg.error()));
         ctx.get().setPacketHandled(true);
     }
 }
