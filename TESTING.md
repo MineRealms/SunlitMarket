@@ -284,5 +284,6 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - GUI：`MarketScreen` 改为固定尺寸窗框（深空当铺 UI 九宫格贴图），搜索框按物品 ID 和本地化名过滤（`Ctrl+F` 聚焦），翻页按钮换成滚动条（滚轮 / 点击轨道 / 拖动滑块），物品悬停显示 tooltip，状态行新增「货架溢价 ±N%」（`baseBuy`/`baseSell` = 不含 E1 稀缺系数的同一条报价）。
 - 客户端/服务端隔离：S2C 一律经 `client/ClientPacketHandlers`；构建后扫描 jar，`net/minecraft/client` 只出现在 `client` 包（70 个非 client 类，0 泄漏）。
 - `gradle --no-daemon test build` 通过：**48 个单测全过**（新增 ChartViewTest 4）。jar sha256 前缀 `661d2b8d`，已同步主客户端 / -DEV / mirror / server-pack 暂存目录。
-- 未做游戏内验证。观察点：点「行情」后出现 3 个指数页签、蜡烛随交易变化、切 4时 不卡；搜索框输入中文/英文都能过滤；滚动条可拖动且松手后按钮仍可点。
+- **DEV 实测发现并修掉一个 E2 遗留 bug**：KubeJS 服务端脚本在资源重载阶段求值，客户端此时集成服务器还没建好，`ServerLifecycleHooks.getCurrentServer()` 是 null，`svIndices.js` 的三次 `SunlitMarket.index(...)` 全部被丢弃（日志里三条 `SunlitMarket.index needs a running server`，但脚本自己的 `[SV-INTEGRATION] price indices registered` 照常打印，极具误导性）。现在定义先进 `PendingIndices` 缓冲，`ServerStartedEvent` 时回放（换世界重进也会重放），提交 `a786346`。`SunlitMarket.index` 改成返回 boolean，另加 `clearIndices()`。
+- 观察点：进世界后日志应出现 `applied 3 buffered price indices`；点「行情」后出现 3 个指数页签、蜡烛随交易变化、切 4时 不卡；搜索框输入中文/英文都能过滤；滚动条可拖动且松手后按钮仍可点。
 - 已知限制：蜡烛要在服务器跑满一个 bucket 才会出现第二根，第一天只有一根会显示为一条横线——这是数据量问题，不是渲染问题。
