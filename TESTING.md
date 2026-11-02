@@ -256,6 +256,16 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 `trade.dynamicPricing`（默认开）：有库存的货架按稀缺度定价，`PriceEngine.scarcity = clamp((initial/max(stock,1))^e, min, max)` 同时作用于买/卖两个方向；玩家卖给商人会把货架补回（上限 `sellOverstockCapacity × initial`）， unlimited（stock:-1）与 fixed/coin 报价不变。日滚 StockData 全量重置即均值回归步。计划中的每笔冲击成本（k·sqrt）未实现——货架本身的库存变动已提供跨交易动态。
 
 `gradle test`：31 个单测全过（新增 PriceEngineTest 8 + StockDataTest 1）。未做游戏内验证；上服后观察点：买空一个货架后 ask 上浮、当日倾销后 bid 下浮、次日复位。
+
+---
+
+## 11. E2 价格指数与蜡烛（2026-11-02，单测级）
+
+- `IndexMath`：几何平均（1000 起步、单成员 ratio 钳制 0.05–20）+ 蜡烛 seed/update，7 个单测。
+- `MarketData`（saved data `sunlitmarket_market`）：成员按 (merchantId, item) 绑定货架；1D/4H 两周期、各 240 根蜡烛环；每 100 tick 采样；停机跨过的 bucket 以最后收盘价平补；NBT 以扁平 int 数组持久化，6 个单测（含 save/load 往返）。
+- KubeJS：`SunlitMarket.index(id, name, [[merchant, item], ...])`；整合包新增 `svIndices.js` 注册 sv.produce（7 成员）/ sv.metal（5）/ sv.delicacy（4），并给 meMerchants.js 的成员货架补了库存与孤山矿石在售条目（买价全部 ≥ Shipping 锚）。
+- 命令 `/sunlitmarket index` 输出实时值；`gradle test` 共 **44 个单测全过**。
+- 未做游戏内验证；服务器观察点：日志出现 `[SV-INTEGRATION] price indices registered`，交易后 `/sunlitmarket index` 数值偏离 1000，跨日出现新蜡烛。
 - `gradle --no-daemon test build` 通过，生成 jar 并同步主客户端 / -DEV / mirror（sha256 前缀 `346db8b5`）。
 
 待服务器验收：实际实体职业名、物品 ID、货池生成、柜台 UI、ME 商人收购条目、mastery 阶段同步。

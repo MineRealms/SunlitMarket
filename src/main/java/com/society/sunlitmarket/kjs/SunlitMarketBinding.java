@@ -7,6 +7,7 @@ import com.society.sunlitmarket.config.SunlitMarketConfig;
 import com.society.sunlitmarket.currency.Currency;
 import com.society.sunlitmarket.market.MarketRegistry;
 import com.society.sunlitmarket.market.PriceModifiers;
+import com.society.sunlitmarket.market.MarketData;
 import com.society.sunlitmarket.market.MarketService;
 import com.society.sunlitmarket.market.Merchant;
 import com.society.sunlitmarket.market.UnlockData;
@@ -45,6 +46,43 @@ public final class SunlitMarketBinding {
             MarketRegistry.clearScript();
         } catch (Throwable t) {
             SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.clear failed", t);
+        }
+    }
+
+    /**
+     * SunlitMarket.index("sv.ore", "矿指", [["me_erebor_miner", "minecraft:raw_iron"], ...]).
+     * Members bind to a merchant offer; the index measures modifier x shelf-scarcity against
+     * the static script base. Candles persist across reloads; membership is replaced.
+     */
+    public void index(String id, Object name, Object members) {
+        try {
+            net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+            if (server == null) {
+                SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.index needs a running server");
+                return;
+            }
+            java.util.List<MarketData.Member> list = new java.util.ArrayList<>();
+            if (members instanceof Iterable<?> rows) {
+                for (Object row : rows) {
+                    if (row instanceof Iterable<?> pair) {
+                        java.util.Iterator<?> it = pair.iterator();
+                        if (it.hasNext()) {
+                            String merchant = String.valueOf(it.next());
+                            String item = it.hasNext() ? String.valueOf(it.next()) : "";
+                            if (!merchant.isBlank() && !item.isBlank()) {
+                                list.add(new MarketData.Member(merchant, item));
+                            }
+                        }
+                    }
+                }
+            }
+            if (list.isEmpty()) {
+                SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.index({}) has no members", id);
+                return;
+            }
+            MarketData.get(server).defineIndex(id, name == null ? id : String.valueOf(name), list);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.index failed", t);
         }
     }
 

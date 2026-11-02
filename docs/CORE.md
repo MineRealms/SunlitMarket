@@ -36,6 +36,10 @@ FTB Teams is optional. Shared party teams use a typed `team:<uuid>` owner even w
 
 `/sunlitmarket team on|off` changes the runtime alignment-sharing policy; edit TOML for a persistent setting. `/sunlitmarket owner` shows the current identity. `/sunlitmarket recovercounter` transfers a targeted counter to the administrator's current owner and cancels requests; it is an explicit recovery action, not an automatic dissolution transfer.
 
+## Price indices
+
+`MarketData` (saved data `sunlitmarket_market`) keeps index membership and OHLC candle rings (1-day and 4-hour, 240 candles each). KubeJS registers members bound to merchant shelves: `SunlitMarket.index(id, name, [[merchantId, item], ...])`. The index is the geometric mean of member ratios (current mid / static script base), where the mid is the offer buy price times price modifiers times the E1 shelf-scarcity factor - so trading with the shelves is what moves the index. `/sunlitmarket index` prints live values. Sampling runs every 100 server ticks; missed buckets after downtime are backfilled flat at the last close. Candle rings persist in the same saved data; membership is replaced on every script reload.
+
 ## Trading counter
 
 Craft `sunlitmarket:counter` using wooden slabs and planks, or obtain it with a development command. Its nine inventory slots are shared only with the owning player/team. Hoppers have no exposed sided slots.

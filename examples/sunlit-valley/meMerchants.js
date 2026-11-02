@@ -44,12 +44,12 @@ if (typeof SunlitMarket !== 'undefined' && Platform.isLoaded('me')) {
     npcType: 'me:shire.peasant',
     offers: [
       { item: 'me:leek', count: 1, buy: 14, sell: 8, stock: 16 },
-      { item: 'me:cucumber', count: 1, buy: 16, sell: 10 },
-      { item: 'me:lettuce', count: 1, buy: 14, sell: 8 },
+      { item: 'me:cucumber', count: 1, buy: 16, sell: 10, stock: 24 },
+      { item: 'me:lettuce', count: 1, buy: 14, sell: 8, stock: 24 },
       { item: 'me:tomato', count: 1, buy: 16, sell: 10, stock: 16 },
       { item: 'me:strawberry', count: 1, buy: 18, sell: 12 },
-      { item: 'me:white_mushroom', count: 1, buy: 12, sell: 7 },
-      { item: 'me:vegetable_soup', count: 1, buy: 80, sell: 55 },
+      { item: 'me:white_mushroom', count: 1, buy: 12, sell: 7, stock: 24 },
+      { item: 'me:vegetable_soup', count: 1, buy: 80, sell: 55, stock: 8 },
       { item: 'society:blueberry', count: 1, sell: svSell('society:blueberry', 24) },
       { item: 'society:cranberry', count: 1, sell: svSell('society:cranberry', 18) },
       { item: 'farmersdelight:tomato', count: 1, sell: svSell('farmersdelight:tomato', 24) },
@@ -70,9 +70,9 @@ if (typeof SunlitMarket !== 'undefined' && Platform.isLoaded('me')) {
       { item: 'society:oil', count: 1, sell: svSell('society:oil', 112) },
       { item: 'society:maple_syrup', count: 1, sell: svSell('society:maple_syrup', 192) },
       { item: 'society:truffle_oil', count: 1, buy: Math.round(svValue('society:truffle_oil', 1536) * 1.24), sell: Math.round(svValue('society:truffle_oil', 1536) * 0.78), stock: 2, unlock: 'sv.farming.master', repGain: 2 },
-      { item: 'me:meat_bowl', count: 1, buy: 96, sell: 72, reputation: 5 },
-      { item: 'me:cooked_meat_skewer', count: 1, buy: 55, sell: 42 },
-      { item: 'me:meat_egg_meal', count: 1, buy: 90, sell: 70 }
+      { item: 'me:meat_bowl', count: 1, buy: 96, sell: 72, reputation: 5, stock: 8 },
+      { item: 'me:cooked_meat_skewer', count: 1, buy: 55, sell: 42, stock: 12 },
+      { item: 'me:meat_egg_meal', count: 1, buy: 90, sell: 70, stock: 8 }
     ]
   })
 
@@ -101,11 +101,11 @@ if (typeof SunlitMarket !== 'undefined' && Platform.isLoaded('me')) {
     tag: 'sunlitmarket.me.lothlorien_herbalist',
     npcType: 'me:lothlorien.civilian',
     offers: [
-      { item: 'me:strawberries', count: 1, buy: 22, sell: 15 },
-      { item: 'me:ghostshroom', count: 1, buy: 20, sell: 12 },
-      { item: 'me:yellow_amanita', count: 1, buy: 20, sell: 12 },
-      { item: 'me:trumpet_shroom', count: 1, buy: 18, sell: 11 },
-      { item: 'me:pipeweed', count: 1, buy: 32, sell: 22, reputation: 5 },
+      { item: 'me:strawberries', count: 1, buy: 22, sell: 15, stock: 16 },
+      { item: 'me:ghostshroom', count: 1, buy: 20, sell: 12, stock: 12 },
+      { item: 'me:yellow_amanita', count: 1, buy: 20, sell: 12, stock: 12 },
+      { item: 'me:trumpet_shroom', count: 1, buy: 18, sell: 11, stock: 12 },
+      { item: 'me:pipeweed', count: 1, buy: 32, sell: 22, reputation: 5, stock: 8 },
       { item: 'society:crystalberry', count: 1, sell: svSell('society:crystalberry', 22) },
       { item: 'society:mana_fruit', count: 1, buy: Math.round(svValue('society:mana_fruit', 256) * 1.25), sell: Math.round(svValue('society:mana_fruit', 256) * 0.78), stock: 2, unlock: 'sv.farming.master', repGain: 2 }
     ]
@@ -118,8 +118,15 @@ if (typeof SunlitMarket !== 'undefined' && Platform.isLoaded('me')) {
     tag: 'sunlitmarket.me.erebor_smith',
     npcType: 'me:longbeards.erebor.miner',
     offers: [
-      { item: 'me:flax', count: 1, buy: 24, sell: 16 },
-      { item: 'minecraft:string', count: 1, buy: 8, sell: 4 },
+      { item: 'me:flax', count: 1, buy: 24, sell: 16, stock: 16 },
+      { item: 'minecraft:string', count: 1, buy: 8, sell: 4, stock: 32 },
+      // Ore restock shelf: buy prices sit just above the Shipping Bin anchor so the
+      // metal index has real, finite supply that player trading can move.
+      { item: 'minecraft:raw_iron', count: 1, buy: 10, sell: 8, stock: 32 },
+      { item: 'minecraft:coal', count: 1, buy: 10, sell: 8, stock: 48 },
+      { item: 'minecraft:iron_ingot', count: 1, buy: 35, sell: 30, stock: 16 },
+      { item: 'oreganized:raw_lead', count: 1, buy: 53, sell: 48, stock: 12 },
+      { item: 'oreganized:raw_silver', count: 1, buy: 70, sell: 64, stock: 8 },
       { item: 'me:copper_coin', count: 1, buy: 2, sell: 1 },
       { item: 'me:silver_coin', count: 1, buy: 16, sell: 8 },
       { item: 'me:gold_coin', count: 1, buy: 128, sell: 64, reputation: 10 },

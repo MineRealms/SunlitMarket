@@ -6,6 +6,7 @@ import com.society.sunlitmarket.alignment.AlignmentData;
 import com.society.sunlitmarket.alignment.FactionRelations;
 import com.society.sunlitmarket.config.SunlitMarketConfig;
 import com.society.sunlitmarket.currency.Currency;
+import com.society.sunlitmarket.market.MarketData;
 import com.society.sunlitmarket.market.MarketRegistry;
 import com.society.sunlitmarket.market.MarketService;
 import com.society.sunlitmarket.market.MarketView;
@@ -109,7 +110,11 @@ public final class SunlitMarketMod {
         if (event.phase != TickEvent.Phase.END) return;
         MinecraftServer server = event.getServer();
         if (server == null) return;
-        long day = server.overworld().getDayTime() / 24000L;
+        long dayTime = server.overworld().getDayTime();
+        if (dayTime % MarketData.SAMPLE_EVERY == 0) {
+            MarketData.get(server).sample(dayTime, server);
+        }
+        long day = dayTime / 24000L;
         if (day == lastAlignmentDay) return;
         lastAlignmentDay = day;
         AlignmentData.get(server).roll(day, server);
@@ -263,6 +268,19 @@ public final class SunlitMarketMod {
                                     ctx.getSource().sendSuccess(() -> Component.literal("Wanted = " + value), false);
                                     return 1;
                                 })))
+                .then(Commands.literal("index").executes(ctx -> {
+                    MarketData data = MarketData.get(ctx.getSource().getServer());
+                    java.util.List<String> ids = data.ids();
+                    if (ids.isEmpty()) {
+                        ctx.getSource().sendSuccess(() -> Component.literal("No indices registered"), false);
+                    }
+                    for (String id : ids) {
+                        int value = data.value(id);
+                        ctx.getSource().sendSuccess(() -> Component.literal(
+                                id + " [" + data.name(id) + "] = " + (value < 0 ? "n/a" : value)), false);
+                    }
+                    return ids.size();
+                }))
                 .then(Commands.literal("factions").executes(ctx -> {
                     java.util.List<String> ids = new java.util.ArrayList<>(FactionRelations.factions());
                     java.util.Collections.sort(ids);

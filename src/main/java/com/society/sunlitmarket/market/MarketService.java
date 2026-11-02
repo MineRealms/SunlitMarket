@@ -16,7 +16,7 @@ import net.minecraftforge.network.PacketDistributor;
 public final class MarketService {
     public static final int ACTION_BUY = 0, ACTION_SELL = 1;
     private MarketService() {}
-    private static String stockKey(Merchant merchant, int index) {
+    static String stockKey(Merchant merchant, int index) {
         Offer offer = merchant.offers.get(index);
         return merchant.id + '#' + (offer.id.isBlank() ? Integer.toString(index) : "id:" + offer.id);
     }
