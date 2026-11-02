@@ -2,11 +2,12 @@
 // ============================================================
 // Market-maker price indices for the pawnshop trading hall.
 //
-// Members bind to merchant shelves by (merchantId, item). The index value is the
-// geometric mean of each member's (price modifier x shelf scarcity) versus its static
-// script base, so it starts at 1000 and moves exactly when players drain or refill the
-// shelves. Prices here are feed stock into those shelves - see meMerchants.js.
-// /sunlitmarket index prints the live values.
+// Members bind to merchant shelves by (merchantId, item). An index only moves when a
+// member actually trades: it is the geometric mean of each member's last traded
+// (price modifier x shelf scarcity) ratio, starting at 1000. Prices here are feed stock
+// into those shelves - see meMerchants.js. /sunlitmarket index prints the live values.
+// Futures are opt-in per index (docs/ECONOMY_ACCOUNTS.md), e.g.:
+//   SunlitMarket.futures({ index: 'sv.metal', tenorDays: 7, band: 0.2, maxLots: 20, minTraders: 2 })
 // ============================================================
 if (typeof SunlitMarket !== 'undefined' && Platform.isLoaded('me')) {
   SunlitMarket.index('sv.produce', '谷蔬指', [

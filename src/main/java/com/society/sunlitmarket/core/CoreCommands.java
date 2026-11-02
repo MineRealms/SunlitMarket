@@ -43,6 +43,13 @@ public final class CoreCommands {
                     String result=com.society.sunlitmarket.audit.AuditSmokeTest.run(c.getSource().getServer());
                     c.getSource().sendSuccess(()->Component.literal(result),false);return result.startsWith("PASS")?1:0;
                 }))
+                .then(Commands.literal("econsmoketest").requires(s->Boolean.getBoolean("sunlitmarket.audit.allowSmoke")).executes(c->{
+                    String result=EconomySmokeTest.run(c.getSource().getServer(),false);
+                    c.getSource().sendSuccess(()->Component.literal(result),false);return result.startsWith("PASS")?1:0;
+                }).then(Commands.literal("keep").executes(c->{
+                    String result=EconomySmokeTest.run(c.getSource().getServer(),true);
+                    c.getSource().sendSuccess(()->Component.literal(result),false);return result.startsWith("PASS")?1:0;
+                })))
                 .then(Commands.literal("status").executes(c->{
                     c.getSource().sendSuccess(()->Component.literal(com.society.sunlitmarket.audit.EconomyAudit.status(c.getSource().getServer())),false);return 1;
                 }))

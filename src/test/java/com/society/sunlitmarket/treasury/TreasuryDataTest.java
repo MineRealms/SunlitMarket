@@ -90,6 +90,9 @@ class TreasuryDataTest {
         assertEquals(0, data.cash());
         assertEquals(2500, data.inject(RESERVE, 2500));
         assertEquals(12_500, data.reserve());
+        var flows = data.status(POLICY).getAsJsonObject("flows");
+        assertEquals(1000, flows.getAsJsonObject("ADMIN_INJECT_CASH").get("out").getAsLong());
+        assertEquals(2500, flows.getAsJsonObject("ADMIN_INJECT_RESERVE").get("in").getAsLong());
     }
 
     @Test void burnOnlyCounts() {

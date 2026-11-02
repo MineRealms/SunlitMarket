@@ -21,6 +21,9 @@ Sunlit Market 是给 Sunlit Valley 整合包写的 NPC 交易/声望附属 mod�
   **但尚未同步到主客户端 / -DEV / mirror**，也未完成 ME NPC 实机验收。
 - **S0 经济观察层**：只记录本模已接入的资金步骤，不是全服 M0；说明和限制见 `docs/S0_OBSERVATIONS.md`。
   隔离专服真实 Currency 自检 14/14 通过；七天连续观测和 Numismatics 实机仍未完成。
+- **资金层（C/R/NPC预算）、成交K线、P2P期货**：见 `docs/ECONOMY_ACCOUNTS.md`。接受仓与货架收购从当铺现金C付款，
+  C不足即拒绝；R是唯一新钱来源；绿宝石默认不再是货币。隔离专服 `econsmoketest` 25/25、重启持久化通过；
+  柜台求购按钮/K线界面变化、Numismatics、FTB真实队伍、多人期货均未实机验证。
 
 ## 2. 当前构建 / 部署
 
@@ -127,6 +130,10 @@ SunlitMarket.merchants()            // 调试 JSON
 SunlitMarket.view(player, "merchant_id")   // 服务端当前视图 JSON（余额/库存/限购/解锁），测试与对话入口用
 SunlitMarket.countItems(player, "minecraft:wheat") // 背包内某物品数量
 SunlitMarket.unlock(player, "theme.tinkers.adept") // 授予玩家解锁 id（任务阶段）
+SunlitMarket.treasury()                       // C/R/burned/流向 JSON
+SunlitMarket.treasuryInject("reserve", 100000) // 管理员增发（负数回收，不低于0）
+SunlitMarket.futures({ index: "sv.metal" })    // 为指数开放 P2P 期货（其余条款有默认值）
+SunlitMarket.futuresJson("sv.metal")           // 只读挂单簿
 SunlitMarket.revoke(player, "theme.tinkers.adept")
 SunlitMarket.isUnlocked(player, "theme.tinkers.adept")
 ```

@@ -163,7 +163,8 @@ public final class TreasuryData extends SavedData {
             reserve = after;
             injectedReserve += applied;
         }
-        flow("ADMIN_INJECT_" + account.name(), 0, applied);
+        // Issuance enters the accounts from outside ("in"); retirement leaves them ("out").
+        flow("ADMIN_INJECT_" + account.name(), Math.max(0L, applied), Math.max(0L, -applied));
         setDirty();
         return applied;
     }
@@ -218,6 +219,21 @@ public final class TreasuryData extends SavedData {
         flows.forEach((source, v) -> flowTag.putLongArray(source, new long[]{v[0], v[1]}));
         tag.put("Flows", flowTag);
         return tag;
+    }
+
+    /** Replaces this instance's state with a saved snapshot; used by isolated test fixtures. */
+    public void restore(CompoundTag tag) {
+        TreasuryData other = load(tag);
+        cash = other.cash;
+        reserve = other.reserve;
+        burned = other.burned;
+        injectedCash = other.injectedCash;
+        injectedReserve = other.injectedReserve;
+        npcSpent = other.npcSpent;
+        lastRollDay = other.lastRollDay;
+        flows.clear();
+        flows.putAll(other.flows);
+        setDirty();
     }
 
     public static TreasuryData load(CompoundTag tag) {

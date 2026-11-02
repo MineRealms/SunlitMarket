@@ -92,7 +92,7 @@ public final class MarketExport {
 
     private static void writeAtomic(Path target, JsonElement json) throws IOException {
         Path temp = target.resolveSibling(target.getFileName() + ".tmp");
-        Files.writeString(temp, new GsonBuilder().setPrettyPrinting().create().toJson(json), StandardCharsets.UTF_8);
+        Files.writeString(temp, new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(json), StandardCharsets.UTF_8);
         try {
             Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException ex) {

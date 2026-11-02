@@ -271,6 +271,16 @@ public final class MarketData extends SavedData {
         return tag;
     }
 
+    /** Replaces this instance's state with a saved snapshot; used by isolated test fixtures. */
+    public synchronized void restore(CompoundTag tag) {
+        MarketData other = load(tag);
+        indices.clear();
+        indices.putAll(other.indices);
+        fills.clear();
+        fills.addAll(other.fills);
+        setDirty();
+    }
+
     public static MarketData load(CompoundTag tag) {
         MarketData data = new MarketData();
         boolean legacy = tag.getInt("version") < VERSION;

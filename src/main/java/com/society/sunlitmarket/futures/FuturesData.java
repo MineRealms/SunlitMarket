@@ -430,6 +430,23 @@ public final class FuturesData extends SavedData {
         return tag;
     }
 
+    /** Replaces this instance's state with a saved snapshot; used by isolated test fixtures. */
+    public void restore(CompoundTag tag) {
+        FuturesData other = load(tag);
+        nextId = other.nextId;
+        escrow = other.escrow;
+        feesBurned = other.feesBurned;
+        offers.clear();
+        offers.putAll(other.offers);
+        contracts.clear();
+        contracts.addAll(other.contracts);
+        claims.clear();
+        claims.putAll(other.claims);
+        history.clear();
+        history.addAll(other.history);
+        setDirty();
+    }
+
     public static FuturesData load(CompoundTag tag) {
         FuturesData data = new FuturesData();
         data.nextId = Math.max(1, tag.getInt("nextId"));

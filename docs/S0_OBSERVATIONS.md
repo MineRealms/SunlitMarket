@@ -1,6 +1,6 @@
 # S0：本模经济观察，不是全服货币总量
 
-本层只旁路记录现有行为，不修改价格、买卖方向、日预算、物品交割、钱包/银行选择或原有失败恢复；不会为审计补扣、补发或重放交易。它不实现新账户体系、NPC需求经济体或期货。
+本层只旁路记录现有行为，不修改价格、买卖方向、日预算、物品交割、钱包/银行选择或原有失败恢复；不会为审计补扣、补发或重放交易。账户体系（C/R）、NPC需求和期货由独立的一层实现，见`docs/ECONOMY_ACCOUNTS.md`；S0只观察它们产生的玩家侧资金步骤。
 
 ## 覆盖
 
@@ -11,6 +11,8 @@
 | `DEPOSIT_BIN_PAYOUT` | 接受仓的实际钱包增量，或现金/银行支付 |
 | `PAY` / `PAY_CASH` / `GIVE` / `SETTLE` | 兼容Java入口，无法确定业务目的时保留通用来源 |
 | `FINE` / `BRIBE` | 既有罚金／贿赂付款步骤 |
+| `NPC_DEMAND` | NPC求购向玩家付款（R与当日预算承担） |
+| `FUTURES_ESCROW` / `FUTURES_PAYOUT` | 期货托管金付款；结算收益或退款发放 |
 | `WALLET_EXCHANGE_IN` / `WALLET_EXCHANGE_OUT` | 现金与钱包两条资金变化，共享operationId，各自只计一次 |
 | `KJS_WALLET_ADD` / `KJS_WALLET_TAKE` | 直接脚本钱包操作的实际本地NBT变化 |
 | `VALUATION_MAPPING_CHANGED` | 已生效面额映射及SHA-256版本，不计净发行 |
@@ -22,7 +24,7 @@ COINS的grossCoinCreated/grossCoinRemoved只来自成功结算中已计算的找
 
 **observedNet是已覆盖资金步骤的合计，不是全服净发行或M0。** 币作为交易商品时，商品本身的面值变化不属于payment leg；直接Wallet.set、命令/其他mod造币、玩家丢币/箱子转账、离线账户和外部银行写入均不在自动覆盖中。开关关闭、未启动、非服务端线程的调用也不保证记录。完整的业务结果（例如付款后另一个模块是否成功修改库存）不能从单条settlement记录推断。
 
-当前`M0=UNKNOWN`，`C/R=NOT_IMPLEMENTED`；已有接受仓日预算仍按原规则工作，S0不把它当作准备金。
+当前`M0=UNKNOWN`。`status`中的C、R、burned、E（期货托管）和futuresClaims读取资金层的实时值；checkpoint本身不保存这些值，按UTC日查询时显示`NOT_RECORDED_PER_DAY`。
 
 ## 文件与生命周期
 
@@ -76,4 +78,4 @@ JSONL schema 2含UTC时间、UTC日期、gameTime/dayTime、来源、后端、�
 
 ## 非目标
 
-不扫描在线/离线全服资产，不自动配置ME/村民pool，不修钱包/接受仓原有经济政策，不修改K线，不发布到主实例、DEV或mirror。客户端与界面均未用于本次S0修正验收。
+不扫描在线/离线全服资产，不自动配置ME/村民pool，不发布到主实例、DEV或mirror。接受仓兑付来源、K线和期货的变更属于资金层，不属于S0。客户端与界面均未用于S0验收。
