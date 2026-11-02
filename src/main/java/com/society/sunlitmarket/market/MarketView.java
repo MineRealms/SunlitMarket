@@ -29,6 +29,9 @@ public final class MarketView {
         public int count = 1;
         public int buy;
         public int sell;
+        /** Same quote without the shelf-scarcity factor; the client draws the difference. */
+        public int baseBuy;
+        public int baseSell;
         public int reputation;
         public int stock = -1;
         public int limit = -1;
@@ -60,6 +63,8 @@ public final class MarketView {
             f.addProperty("count", line.count);
             f.addProperty("buy", line.buy);
             f.addProperty("sell", line.sell);
+            f.addProperty("baseBuy", line.baseBuy);
+            f.addProperty("baseSell", line.baseSell);
             f.addProperty("reputation", line.reputation);
             f.addProperty("stock", line.stock);
             f.addProperty("limit", line.limit);
@@ -97,6 +102,8 @@ public final class MarketView {
                     line.count = f.has("count") ? f.get("count").getAsInt() : 1;
                     line.buy = f.has("buy") ? f.get("buy").getAsInt() : 0;
                     line.sell = f.has("sell") ? f.get("sell").getAsInt() : 0;
+                    line.baseBuy = f.has("baseBuy") ? f.get("baseBuy").getAsInt() : line.buy;
+                    line.baseSell = f.has("baseSell") ? f.get("baseSell").getAsInt() : line.sell;
                     line.reputation = f.has("reputation") ? f.get("reputation").getAsInt() : 0;
                     line.stock = f.has("stock") ? f.get("stock").getAsInt() : -1;
                     line.limit = f.has("limit") ? f.get("limit").getAsInt() : -1;

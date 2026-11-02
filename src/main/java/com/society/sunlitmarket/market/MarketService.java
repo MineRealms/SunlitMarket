@@ -56,9 +56,11 @@ public final class MarketService {
         for (int i = 0; i < m.offers.size(); i++) {
             Offer offer = m.offers.get(i); MarketView.Line line = new MarketView.Line();
             line.item = offer.item; line.count = offer.count; line.offerId = offer.id.isBlank() ? "legacy:" + i : offer.id;
-            Quote q;
+            Quote q, base;
             try { q = quote(p, m, offer, i); } catch (IllegalArgumentException ex) { q = new Quote(0, 0); }
+            try { base = quote(p, m, offer); } catch (IllegalArgumentException ex) { base = q; }
             line.buy = q.buy; line.sell = q.sell; line.reputation = offer.reputation;
+            line.baseBuy = base.buy; line.baseSell = base.sell;
             line.hasReputation = offer.hasReputation;
             line.stock = stock.get(stockKey(m, i), legacyStockKey(m, i), offer.stock); line.limit = offer.limit;
             line.used = limits.used(p, stockKey(m, i), legacyStockKey(m, i)); line.unlock = offer.unlock == null ? "" : offer.unlock;
