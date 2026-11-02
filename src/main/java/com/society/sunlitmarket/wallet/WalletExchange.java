@@ -41,6 +41,7 @@ public final class WalletExchange {
         Long before = com.society.sunlitmarket.audit.EconomyAudit.walletBefore(player);
         Wallet.add(player, credited);
         com.society.sunlitmarket.audit.EconomyAudit.walletAfter(player, before, credited, true, "WALLET_EXCHANGE_IN");
+        com.society.sunlitmarket.treasury.Treasury.burn(player.getServer(), available - credited, "WALLET_EXCHANGE_FEE");
         return "存入 " + available + " → 钱包 +" + credited + "（手续费 " + fee() + "%）";
     }
 
@@ -65,6 +66,7 @@ public final class WalletExchange {
             return "背包放不下 " + paid + " spur，已退回钱包";
         }
         com.society.sunlitmarket.audit.EconomyAudit.walletAfter(player, before, -amount, true, "WALLET_EXCHANGE_OUT");
+        com.society.sunlitmarket.treasury.Treasury.burn(player.getServer(), amount - paid, "WALLET_EXCHANGE_FEE");
         return "钱包 −" + amount + " → 取出 " + paid + "（手续费 " + fee() + "%）";
     }
 

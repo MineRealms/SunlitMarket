@@ -16,8 +16,9 @@ import java.util.UUID;
  * <p>Without it the bin is a printing press - Minecraft production has no ceiling, so "sell
  * everything you can make" has to run into a wall. The wall is a day counter plus two caps, kept
  * in the overworld's SavedData so a restart cannot hand out a second budget for the same day.
- * The day is the server's own {@code getDayTime() / 24000}, never the wall clock: restarts, time
- * zones and clock changes would otherwise open a cross-day hole.
+ * The day is {@link com.society.sunlitmarket.core.EconomyClock}, never the wall clock or the
+ * visible day: restarts, time zones, {@code /time} and sleeping would otherwise open a cross-day hole.
+ * The bin's payouts themselves come out of pawn cash; this ledger only spreads them across players.
  *
  * <p>Server-side only.
  */

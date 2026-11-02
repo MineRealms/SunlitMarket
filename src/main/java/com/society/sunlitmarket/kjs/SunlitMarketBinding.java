@@ -452,6 +452,37 @@ public final class SunlitMarketBinding {
         return "钱包取出失败";
     }
 
+    /** Pawn cash, reserve, burned fees and per-source flows as JSON; "{}" with no server running. */
+    public String treasury() {
+        try {
+            var server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+            return server == null ? "{}" : com.society.sunlitmarket.treasury.Treasury.status(server).toString();
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.treasury failed", t);
+        }
+        return "{}";
+    }
+
+    /**
+     * Administrator issuance into "cash" or "reserve"; a negative delta retires money but never
+     * below zero. Returns the delta actually applied.
+     */
+    public long treasuryInject(String account, long delta) {
+        try {
+            var server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+            if (server == null) return 0L;
+            var target = "cash".equalsIgnoreCase(account) ? com.society.sunlitmarket.treasury.TreasuryData.Account.CASH
+                    : com.society.sunlitmarket.treasury.TreasuryData.Account.RESERVE;
+            if (!"cash".equalsIgnoreCase(account) && !"reserve".equalsIgnoreCase(account)) return 0L;
+            long applied = com.society.sunlitmarket.treasury.Treasury.data(server).inject(target, delta);
+            SunlitMarketMod.LOG.info("[SunlitMarket] script treasury inject {} {} (applied {})", target, delta, applied);
+            return applied;
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.treasuryInject failed", t);
+        }
+        return 0L;
+    }
+
     /** How many of an item id the player carries (scripts, quest checks). */
     public int countItems(Player player, String itemId) {
         try {

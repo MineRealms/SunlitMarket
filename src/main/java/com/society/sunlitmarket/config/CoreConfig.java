@@ -19,6 +19,8 @@ public final class CoreConfig {
     public static final ForgeConfigSpec.DoubleValue WANTED_SURCHARGE, HAGGLE_CHANCE, REGION_RADIUS;
     public static final ForgeConfigSpec.BooleanValue INSPECT_COUNTER, BRIBE_ENABLED, KILL_REWARDS;
     public static final ForgeConfigSpec.IntValue BRIBE_PRICE, BRIBE_REDUCTION, HAGGLE_FAILURE_LOSS, STOLEN_ALIGNMENT_LOSS, CONTRABAND_WANTED, KILL_LOSS, ENEMY_KILL_GAIN;
+    public static final ForgeConfigSpec.BooleanValue TREASURY_ENABLED;
+    public static final ForgeConfigSpec.LongValue INITIAL_CASH, INITIAL_RESERVE, CASH_TARGET, CASH_CEILING, DAILY_REFILL, NPC_DAILY_BUDGET;
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
         b.push("teams");
@@ -69,6 +71,15 @@ public final class CoreConfig {
         KILL_REWARDS = b.comment("Explicit opt-in; territorial rewards need valid dimension/region data.").define("killAlignmentEnabled", false);
         KILL_LOSS = b.defineInRange("friendlyKillLoss", 25, 0, 10000);
         ENEMY_KILL_GAIN = b.defineInRange("regionalEnemyKillGain", 5, 0, 10000);
+        b.pop().push("treasury");
+        TREASURY_ENABLED = b.comment("Pawn cash (C) pays the acceptance bin and shelf buybacks; the issuance reserve (R) refills C and funds NPC demand.",
+                "Disabling returns to the old behaviour where every system payout is minted from nothing.").define("enabled", true);
+        INITIAL_CASH = b.comment("Seeded once, when a world first creates its treasury.").defineInRange("initialCash", 200_000L, 0L, Long.MAX_VALUE / 4);
+        INITIAL_RESERVE = b.defineInRange("initialReserve", 5_000_000L, 0L, Long.MAX_VALUE / 4);
+        CASH_TARGET = b.comment("Each economy day the reserve tops pawn cash up toward this level.").defineInRange("cashTarget", 200_000L, 0L, Long.MAX_VALUE / 4);
+        CASH_CEILING = b.comment("Pawn cash above this level is swept back into the reserve each economy day.").defineInRange("cashCeiling", 400_000L, 0L, Long.MAX_VALUE / 4);
+        DAILY_REFILL = b.defineInRange("dailyRefill", 100_000L, 0L, Long.MAX_VALUE / 4);
+        NPC_DAILY_BUDGET = b.comment("Spur the NPC economy may pay players per economy day for goods it consumes.").defineInRange("npcDailyBudget", 50_000L, 0L, Long.MAX_VALUE / 4);
         b.pop();
         SPEC = b.build();
     }

@@ -28,6 +28,6 @@ class AuditCheckpointTest {
         var c=new AuditCheckpoint();for(int i=1;i<=2;i++){var e=AuditEventTest.event(i,"CONFIRMED",Long.MAX_VALUE);c.attempt(e);c.written(e);}
         assertEquals(BigInteger.valueOf(Long.MAX_VALUE).multiply(BigInteger.TWO),c.observedNet());
     }
-    @Test void absentAccountsAreNotZero(){var c=new AuditCheckpoint();assertEquals("UNKNOWN",c.status().get("M0").getAsString());assertEquals("NOT_IMPLEMENTED",c.status().get("R").getAsString());}
+    @Test void absentAccountsAreNotZero(){var c=new AuditCheckpoint();assertEquals("UNKNOWN",c.status().get("M0").getAsString());assertEquals("SEE_TREASURY",c.status().get("R").getAsString());}
     @Test void mappingControlDoesNotMint(){var c=new AuditCheckpoint();var e=AuditEventTest.event(1,"CONTROL",null);c.attempt(e);c.written(e);assertEquals(0,c.unknown());assertEquals(0,c.confirmed());assertEquals(BigInteger.ZERO,c.observedNet());}
 }

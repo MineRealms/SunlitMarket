@@ -57,10 +57,25 @@ public final class CoreCommands {
                         c.getSource().sendSuccess(()->Component.literal(result),false);return 1;
                     } catch(java.time.DateTimeException ex){c.getSource().sendFailure(Component.literal("Expected UTC date YYYY-MM-DD"));return 0;}
                 }))))
+            .then(Commands.literal("treasury")
+                .then(Commands.literal("status").executes(c->{
+                    c.getSource().sendSuccess(()->Component.literal(com.society.sunlitmarket.treasury.Treasury.status(c.getSource().getServer()).toString()),false);return 1;
+                }))
+                .then(Commands.literal("inject").then(treasuryInject("cash",com.society.sunlitmarket.treasury.TreasuryData.Account.CASH))
+                    .then(treasuryInject("reserve",com.society.sunlitmarket.treasury.TreasuryData.Account.RESERVE))))
             .then(Commands.literal("selftest").executes(c->{
                 ServerPlayer p=c.getSource().getPlayerOrException();
                 if(!p.server.isSingleplayer()&&!Boolean.getBoolean("sunlitmarket.allowSelfTest")){c.getSource().sendFailure(Component.literal("Self-test is restricted to isolated development worlds"));return 0;}
                 String result=CoreSelfTest.run(p);c.getSource().sendSuccess(()->Component.literal(result),false);return result.contains("FAIL")?0:1;
             })));
+    }
+    /** Administrator issuance (positive) or retirement (negative); logged and tracked apart from trade flows. */
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<net.minecraft.commands.CommandSourceStack> treasuryInject(String name,com.society.sunlitmarket.treasury.TreasuryData.Account account){
+        return Commands.literal(name).then(Commands.argument("amount",com.mojang.brigadier.arguments.LongArgumentType.longArg()).executes(c->{
+            long delta=com.mojang.brigadier.arguments.LongArgumentType.getLong(c,"amount");
+            long applied=com.society.sunlitmarket.treasury.Treasury.data(c.getSource().getServer()).inject(account,delta);
+            com.society.sunlitmarket.SunlitMarketMod.LOG.info("[SunlitMarket] treasury inject {} {} by {} (applied {})",account,delta,c.getSource().getTextName(),applied);
+            c.getSource().sendSuccess(()->Component.literal("Treasury "+account+" adjusted by "+applied),true);return 1;
+        }));
     }
 }

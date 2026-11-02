@@ -139,6 +139,11 @@ public final class EconomyAudit {
         o.addProperty("observerErrors", observerErrors); o.addProperty("valuationVersion", mapping);
         o.addProperty("fileSinkFailed", journal == null || journal.failed());
         o.addProperty("enabled", !Boolean.getBoolean("sunlitmarket.audit.disabled"));
+        try {
+            JsonObject treasury = com.society.sunlitmarket.treasury.Treasury.status(server);
+            o.add("C", treasury.get("C")); o.add("R", treasury.get("R")); o.add("burned", treasury.get("burned"));
+            o.add("treasury", treasury);
+        } catch (RuntimeException ex) { o.addProperty("C", "UNAVAILABLE"); o.addProperty("R", "UNAVAILABLE"); }
         return o.toString();
     }
     public static String day(MinecraftServer server, String date) {

@@ -47,7 +47,7 @@ public final class CoreEvents {
             }
         });
     }
-    private static void tick(TickEvent.ServerTickEvent e){if(e.phase==TickEvent.Phase.END){CrimeService.tick(e.getServer());com.society.sunlitmarket.audit.EconomyAudit.tick(e.getServer());}}
+    private static void tick(TickEvent.ServerTickEvent e){if(e.phase==TickEvent.Phase.END){CrimeService.tick(e.getServer());com.society.sunlitmarket.audit.EconomyAudit.tick(e.getServer());com.society.sunlitmarket.treasury.Treasury.tick(e.getServer());}}
     private static void breakBlock(BlockEvent.BreakEvent e){
         if(e.getLevel().getBlockEntity(e.getPos()) instanceof CounterBlockEntity be&&!be.access(e.getPlayer())&&!e.getPlayer().hasPermissions(2))e.setCanceled(true);
     }

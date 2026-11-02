@@ -9,6 +9,8 @@ import com.society.sunlitmarket.core.TradeMath;
 import com.society.sunlitmarket.currency.Currency;
 import com.society.sunlitmarket.net.MarketUpdateMessage;
 import com.society.sunlitmarket.net.OpenMarketMessage;
+import com.society.sunlitmarket.treasury.Treasury;
+import com.society.sunlitmarket.treasury.TreasuryData;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraftforge.network.PacketDistributor;
@@ -121,10 +123,13 @@ public final class MarketService {
                 "beforeTrade",p,null,m.faction,key,Currency.item(offer.item),total));
         if (hook.cancelled) return "交易被脚本取消";
         if (hook.price != total) return "货架价格变更请使用价格倍率接口并重新确认";
-        String result = Currency.settle(p, action == ACTION_SELL ? p.getInventory() : null,
-                action == ACTION_BUY ? p.getInventory() : null, Currency.item(offer.item), count,
-                action == ACTION_BUY ? -total : total, action == ACTION_BUY ? "MARKET_BUY" : "MARKET_SELL");
+        // Shelf buybacks are paid out of pawn cash; shelf sales refill it.
+        String result = action == ACTION_BUY
+                ? Currency.settle(p, null, p.getInventory(), Currency.item(offer.item), count, -total, "MARKET_BUY")
+                : Treasury.payout(p, TreasuryData.Account.CASH, false, total, "MARKET_SELL",
+                        () -> Currency.settle(p, p.getInventory(), null, Currency.item(offer.item), count, total, "MARKET_SELL"));
         if (!result.isEmpty()) return result;
+        if (action == ACTION_BUY) Treasury.receive(p.server, TreasuryData.Account.CASH, total, "MARKET_BUY");
         if (action == ACTION_BUY) { stock.take(key, offer.stock, qty); limits.add(p, key, qty); }
         if (action == ACTION_SELL && offer.stock >= 0) { stock.add(key, offer.stock, qty, CoreConfig.SELL_OVERSTOCK.get()); }
         if (reward > 0) AlignmentData.get(p.server).add(p, m.faction, reward);

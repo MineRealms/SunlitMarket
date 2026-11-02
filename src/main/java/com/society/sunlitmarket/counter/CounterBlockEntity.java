@@ -104,6 +104,8 @@ public final class CounterBlockEntity extends BlockEntity implements net.minecra
         if(hook.price!=r.ask){r.ask=hook.price;setChanged();return "报价已更新，请重新确认";}
         String result=Currency.settle(p,null,this,goods,goods.getCount(),-r.ask,"COUNTER_PURCHASE");
         if(!result.isEmpty())return result;
+        // Money paid to an NPC leaves player circulation and returns to the issuance reserve.
+        com.society.sunlitmarket.treasury.Treasury.receive(p.server,com.society.sunlitmarket.treasury.TreasuryData.Account.RESERVE,r.ask,"COUNTER_PURCHASE");
         requests.remove(r);setChanged();
         if(r.heat>0) {AlignmentData.get(p.server).addWanted(p,Math.max(0,r.wanted));AlignmentData.get(p.server).add(p,r.faction,-CoreConfig.STOLEN_ALIGNMENT_LOSS.get());}
         else if((long)r.ask*100>= (long)r.market*90) AlignmentData.get(p.server).add(p,r.faction,

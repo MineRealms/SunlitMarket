@@ -3,6 +3,9 @@ package com.society.sunlitmarket.deposit;
 import com.google.gson.JsonObject;
 import com.society.sunlitmarket.SunlitMarketMod;
 import com.society.sunlitmarket.currency.Currency;
+import com.society.sunlitmarket.treasury.Treasury;
+import com.society.sunlitmarket.treasury.TreasuryData;
+import com.society.sunlitmarket.wallet.Wallet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -129,9 +132,10 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
     }
 
     /**
-     * Pays out everything stored. The wallet is credited first: if the player cannot be paid, no
-     * goods are destroyed. With the wallet disabled the payout falls back to cash/bank, which can
-     * fail on a full inventory - hence the error is returned before anything is drained.
+     * Pays out everything stored, out of pawn cash. The payment happens first: if the till is short
+     * or the player cannot be paid, no goods are destroyed. With the wallet disabled the payout
+     * falls back to cash/bank, which can fail on a full inventory - hence the error is returned
+     * before anything is drained.
      */
     public String collect(ServerPlayer player) {
         int total = value();
@@ -149,19 +153,26 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
                 return lastMessage;
             }
         }
-        if (com.society.sunlitmarket.wallet.Wallet.enabled()) {
-            Long auditBefore = com.society.sunlitmarket.audit.EconomyAudit.walletBefore(player);
-            com.society.sunlitmarket.wallet.Wallet.add(player, total);
-            com.society.sunlitmarket.audit.EconomyAudit.walletAfter(player, auditBefore, total, true, "DEPOSIT_BIN_PAYOUT");
+        if (Wallet.enabled()) {
+            // Wallet.add saturates; refusing up front keeps the till debit equal to what lands.
+            if (Long.MAX_VALUE - Wallet.balance(player) < total) return lastMessage = "钱包已满";
+            String error = Treasury.payout(player, TreasuryData.Account.CASH, false, total, "DEPOSIT_BIN_PAYOUT", () -> {
+                Long auditBefore = com.society.sunlitmarket.audit.EconomyAudit.walletBefore(player);
+                Wallet.add(player, total);
+                com.society.sunlitmarket.audit.EconomyAudit.walletAfter(player, auditBefore, total, true, "DEPOSIT_BIN_PAYOUT");
+                return "";
+            });
+            if (!error.isEmpty()) return lastMessage = error;
             drain();
             if (ledger != null) ledger.record(player, today, total);
             lastPayout = total;
-            lastMessage = "回收 +" + total + " → 钱包 " + com.society.sunlitmarket.wallet.Wallet.balance(player);
+            lastMessage = "回收 +" + total + " → 钱包 " + Wallet.balance(player);
             setChanged();
             return lastMessage;
         }
-        String error = Currency.settle(player, null, null, ItemStack.EMPTY, 0, total, "DEPOSIT_BIN_PAYOUT");
-        if (error != null && !error.isEmpty()) return error;
+        String error = Treasury.payout(player, TreasuryData.Account.CASH, false, total, "DEPOSIT_BIN_PAYOUT",
+                () -> Currency.settle(player, null, null, ItemStack.EMPTY, 0, total, "DEPOSIT_BIN_PAYOUT"));
+        if (!error.isEmpty()) return lastMessage = error;
         drain();
         if (ledger != null) ledger.record(player, today, total);
         lastPayout = total;
@@ -170,9 +181,9 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
         return lastMessage;
     }
 
-    /** The server's own day counter; never the wall clock. */
+    /** The economy day; neither the wall clock nor anything /time or sleeping can move. */
     private long today() {
-        return level == null ? 0L : level.getDayTime() / 24000L;
+        return level == null || level.getServer() == null ? 0L : com.society.sunlitmarket.core.EconomyClock.day(level.getServer());
     }
 
     /** Spur this player may still be paid today, or -1 when the budget is off/uncapped. */

@@ -61,7 +61,7 @@ public final class AuditCheckpoint extends SavedData {
         o.addProperty("dropped", dropped); o.addProperty("confirmed", confirmed); o.addProperty("failed", failed); o.addProperty("unknown", unknown);
         o.addProperty("observedNet", observedNet.toString()); o.addProperty("attemptSequence", sequence); o.addProperty("writtenSequence", writtenSequence);
         o.addProperty("reconciliationRequired", reconciliationRequired); o.addProperty("cleanStop", clean);
-        o.addProperty("M0", "UNKNOWN"); o.addProperty("C", "NOT_IMPLEMENTED"); o.addProperty("R", "NOT_IMPLEMENTED");
+        o.addProperty("M0", "UNKNOWN"); o.addProperty("C", "SEE_TREASURY"); o.addProperty("R", "SEE_TREASURY");
         o.addProperty("durability", "BEST_EFFORT; checkpoint and JSONL are not atomic; crashes may lose undetectable tails");
         JsonObject src = new JsonObject(); sources.forEach(src::addProperty); o.add("sources", src);
         return o;
@@ -74,7 +74,7 @@ public final class AuditCheckpoint extends SavedData {
             o.addProperty("confirmed", d.confirmed); o.addProperty("failed", d.failed); o.addProperty("unknown", d.unknown);
             o.addProperty("observedNet", d.net.toString()); o.addProperty("firstObservation", d.first); o.addProperty("lastObservation", d.last);
         }
-        o.addProperty("M0", "UNKNOWN"); o.addProperty("C", "NOT_IMPLEMENTED"); o.addProperty("R", "NOT_IMPLEMENTED"); return o;
+        o.addProperty("M0", "UNKNOWN"); o.addProperty("C", "NOT_RECORDED_PER_DAY"); o.addProperty("R", "NOT_RECORDED_PER_DAY"); return o;
     }
     public List<String> recentGaps() { return List.copyOf(gaps); }
     public long attempted() { return attempted; }

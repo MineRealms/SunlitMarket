@@ -8,6 +8,8 @@ import com.society.sunlitmarket.core.MarketRules;
 import com.society.sunlitmarket.core.TradeMath;
 import com.society.sunlitmarket.counter.CounterBlockEntity;
 import com.society.sunlitmarket.currency.Currency;
+import com.society.sunlitmarket.treasury.Treasury;
+import com.society.sunlitmarket.treasury.TreasuryData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
@@ -63,6 +65,7 @@ public final class CrimeService {
         if(now<p.getPersistentData().getLong("sunlitmarket.nextBribe"))return "贿赂冷却中";
         if(AlignmentData.get(p.server).wanted(p)<=0)return "没有通缉记录";
         if(!Currency.pay(p,CoreConfig.BRIBE_PRICE.get(),"BRIBE"))return "贿赂支付失败";
+        Treasury.receive(p.server,TreasuryData.Account.RESERVE,CoreConfig.BRIBE_PRICE.get(),"BRIBE");
         AlignmentData.get(p.server).addWanted(p,-CoreConfig.BRIBE_REDUCTION.get());
         p.getPersistentData().putLong("sunlitmarket.nextBribe",now+CoreConfig.INSPECTION_COOLDOWN.get());
         p.getPersistentData().putLong("sunlitmarket.nextInspection",now+CoreConfig.INSPECTION_COOLDOWN.get());
@@ -85,6 +88,7 @@ public final class CrimeService {
         if(maxTier==0)return "检查完成：未发现违禁品";
         int fine=TradeMath.amount((long)maxTier*CoreConfig.FINE_PER_TIER.get());
         boolean paid=fine==0||Currency.pay(p,fine,"FINE");
+        if(paid)Treasury.receive(p.server,TreasuryData.Account.RESERVE,fine,"FINE");
         int removed=0;
         if(CoreConfig.CONFISCATION.get())for(Container c:sources){
             for(int i=0;i<c.getContainerSize()&&removed<CoreConfig.CONFISCATION_LIMIT.get();i++){
