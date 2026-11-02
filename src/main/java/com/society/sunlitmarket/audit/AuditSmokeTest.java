@@ -22,8 +22,11 @@ public final class AuditSmokeTest {
         var inventory = Currency.snapshot(p.getInventory());
         CompoundTag original = p.getPersistentData().copy();
         String disabled = System.getProperty("sunlitmarket.audit.disabled");
+        int emerald = Currency.coinValue("minecraft:emerald");
         int checks = 0;
         try {
+            // Emeralds are not money by default; this fixture opts them in for the run only.
+            Currency.setCoinValue("minecraft:emerald", 1);
             for (boolean off : new boolean[]{false, true}) {
                 System.setProperty("sunlitmarket.audit.disabled", Boolean.toString(off));
                 p.getInventory().clearContent(); p.getPersistentData().remove("sunlitmarket.bankUncertain");
@@ -50,6 +53,7 @@ public final class AuditSmokeTest {
             for(int i=0;i<inventory.size();i++)p.getInventory().setItem(i,inventory.get(i));
             for(String k:new java.util.HashSet<>(p.getPersistentData().getAllKeys()))p.getPersistentData().remove(k);
             p.getPersistentData().merge(original);
+            Currency.setCoinValue("minecraft:emerald",emerald);
             if(disabled==null)System.clearProperty("sunlitmarket.audit.disabled");else System.setProperty("sunlitmarket.audit.disabled",disabled);
         }
     }

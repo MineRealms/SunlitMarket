@@ -30,7 +30,7 @@ public final class Currency {
         values.put("numismatics:sprocket", 16); values.put("numismatics:cog", 64);
         values.put("numismatics:crown", 512); values.put("numismatics:sun", 4096);
         values.put("numismatics:neptunium_coin", 32768); values.put("numismatics:ancient_coin", 262144);
-        values.put("numismatics:prismatic_coin", 16777216); values.put("minecraft:emerald", 1);
+        values.put("numismatics:prismatic_coin", 16777216);
     }
     public static synchronized void beginScripts() { staging = new LinkedHashMap<>(); defaults(staging); }
     public static synchronized void endScripts(boolean valid) {

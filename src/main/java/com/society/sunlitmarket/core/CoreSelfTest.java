@@ -31,7 +31,9 @@ public final class CoreSelfTest {
         if(!oldState.isAir())return "FAIL test position must be air two blocks above player";
         Villager npc=null;
         String migrationId="__core_migration_"+p.server.overworld().getGameTime();
+        int emerald=Currency.coinValue("minecraft:emerald");
         try{
+            Currency.setCoinValue("minecraft:emerald",1);
             // This probe uses item currency only; installed-bank settlement is separately verified.
             if(net.minecraftforge.fml.ModList.get().isLoaded("numismatics"))return "FAIL run coin fixture without Numismatics";
             p.getInventory().clearContent();p.getInventory().setItem(0,new ItemStack(Items.EMERALD,64));
@@ -106,6 +108,7 @@ public final class CoreSelfTest {
             p.level().setBlock(pos,oldState,3);
             for(int i=0;i<inventory.size();i++)p.getInventory().setItem(i,inventory.get(i));p.getInventory().setChanged();
             AlignmentData.get(p.server).set(p,"sunlitmarket:test",originalAlignment);AlignmentData.get(p.server).setWanted(p,originalWanted);CoreConfig.FINE_PER_TIER.set(originalFine);
+            Currency.setCoinValue("minecraft:emerald",emerald);
             MarketRegistry.removeScript("__core_test");MarketRegistry.removeScript(migrationId);MarketRules.removeScript("__core_npc");MarketRules.removeScript("__core_pool");
             SunlitMarketMod.LOG.info("[SM-CORE-TEST] completed assertions {}",passed);
         }

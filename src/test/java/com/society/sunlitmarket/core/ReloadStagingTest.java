@@ -37,4 +37,14 @@ class ReloadStagingTest {
             Currency.resetValues();
         }
     }
+
+    @Test void emeraldIsNotMoneyByDefault() {
+        try {
+            Currency.resetValues();
+            assertEquals(0, Currency.coinValue("minecraft:emerald"));
+            assertEquals(1, Currency.coinValue("numismatics:spur"));
+        } finally {
+            Currency.resetValues();
+        }
+    }
 }

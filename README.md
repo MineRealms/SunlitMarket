@@ -21,8 +21,8 @@ Output: `build/libs/sunlitmarket-1.20.1-0.1.0.jar` (reobfuscated).
 ## Test client
 
 `run-client/kubejs/server_scripts/sunlitmarket_test.js` registers a test
-merchant and opens it automatically. Currency fallback is `minecraft:emerald`
-(value 1) for the dev harness only.
+merchant and opens it automatically. The script registers `minecraft:emerald`
+as a value-1 coin for the dev harness only; emeralds are not money by default.
 
 ```powershell
 H:\MinecraftMods\gradle-8.14.5\bin\gradle.bat --no-daemon runClient -PquickPlay=smtest
