@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 public final class SunlitMarketMod {
     public static final String MOD_ID = "sunlitmarket";
     public static final Logger LOG = LoggerFactory.getLogger(MOD_ID);
-    private static final String PROTOCOL = "2";
+    private static final String PROTOCOL = "3";
     private long lastAlignmentDay = Long.MIN_VALUE;
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.ChannelBuilder
@@ -64,6 +64,8 @@ public final class SunlitMarketMod {
         com.society.sunlitmarket.config.CoreConfig.register();
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
         com.society.sunlitmarket.counter.CounterRegistry.register(bus);
+        com.society.sunlitmarket.deposit.DepositRegistry.register(bus);
+        com.society.sunlitmarket.deposit.DepositCompat.probe();
         com.society.sunlitmarket.core.CoreEvents.register(bus);
         bus.addListener(this::onCommonSetup);
         MinecraftForge.EVENT_BUS.addListener(this::onServerTick);
@@ -72,7 +74,9 @@ public final class SunlitMarketMod {
         MinecraftForge.EVENT_BUS.addListener(EventPriority.LOWEST, true, this::onEntityInteract);
         MinecraftForge.EVENT_BUS.addListener(this::onEntityJoin);
         MinecraftForge.EVENT_BUS.addListener(this::onChangeTarget);
-        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> { com.society.sunlitmarket.client.MarketClient.init(); com.society.sunlitmarket.client.CounterClient.init(); });
+        MinecraftForge.EVENT_BUS.addGenericListener(net.minecraft.world.level.block.entity.BlockEntity.class,
+                com.society.sunlitmarket.deposit.DepositRegistry::attach);
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> { com.society.sunlitmarket.client.MarketClient.init(); com.society.sunlitmarket.client.CounterClient.init(); com.society.sunlitmarket.client.DepositClient.init(); });
     }
 
     private void onCommonSetup(FMLCommonSetupEvent event) {
@@ -100,6 +104,9 @@ public final class SunlitMarketMod {
         CHANNEL.messageBuilder(com.society.sunlitmarket.net.ChartDataMessage.class, 7, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(com.society.sunlitmarket.net.ChartDataMessage::encode).decoder(com.society.sunlitmarket.net.ChartDataMessage::decode)
                 .consumerMainThread(com.society.sunlitmarket.net.ChartDataMessage::handle).add();
+        CHANNEL.messageBuilder(com.society.sunlitmarket.net.DepositStateMessage.class, 8, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(com.society.sunlitmarket.net.DepositStateMessage::encode).decoder(com.society.sunlitmarket.net.DepositStateMessage::decode)
+                .consumerMainThread(com.society.sunlitmarket.net.DepositStateMessage::handle).add();
         LOG.info("[SunlitMarket] ready (numismatics={})", ModList.get().isLoaded("numismatics"));
     }
 

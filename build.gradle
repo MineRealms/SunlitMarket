@@ -44,6 +44,9 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     compileOnly fg.deobf("dev.latvian.mods:kubejs-forge:${kubejs_version}")
     compileOnly fg.deobf("dev.latvian.mods:rhino-forge:${rhino_version}")
+    // Thaumcraft 4 Redux build 20748, the exact build shipped in Sunlit Valley. Compile-only:
+    // the essentia port is only instantiated when the mod is present at runtime.
+    compileOnly files('libs/thaumcraft-forge-4.2.3.5-1.20.1-port.0.1.0-20748-api.jar')
     if (!project.hasProperty('coreMinimal')) {
         runtimeOnly fg.deobf("dev.latvian.mods:kubejs-forge:${kubejs_version}")
         runtimeOnly fg.deobf("dev.latvian.mods:rhino-forge:${rhino_version}")

@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "sunlitmarket:block/deposit_bin" },
+    "facing=east": { "model": "sunlitmarket:block/deposit_bin", "y": 90 },
+    "facing=south": { "model": "sunlitmarket:block/deposit_bin", "y": 180 },
+    "facing=west": { "model": "sunlitmarket:block/deposit_bin", "y": 270 }
+  }
+}

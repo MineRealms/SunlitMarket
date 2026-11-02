@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "IGI",
+    "ICI",
+    "III"
+  ],
+  "key": {
+    "I": { "tag": "forge:ingots/iron" },
+    "G": { "tag": "forge:ingots/gold" },
+    "C": { "item": "minecraft:chest" }
+  },
+  "result": {
+    "item": "sunlitmarket:deposit_bin"
+  }
+}

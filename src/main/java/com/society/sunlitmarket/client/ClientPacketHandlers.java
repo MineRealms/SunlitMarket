@@ -30,4 +30,8 @@ public final class ClientPacketHandlers {
     public static void openChart(String json) {
         MarketClient.openChart(json);
     }
+
+    public static void depositState(String json) {
+        DepositClient.acceptState(json);
+    }
 }
