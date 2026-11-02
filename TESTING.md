@@ -254,4 +254,6 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 
 启动时曾出现 `TypeError: redeclaration of const CROP`：`meTrades.js` 的 `const CROP` 与 `tfTrades.js` 同名，KubeJS startup 脚本共享作用域且会重复求值。现已改为唯一的 `let ME_CROP` / `ME_ARTISAN`，并去掉箭头参数数组解构；主客户端启动脚本恢复为 104/104、0 errors。
 
+服务端 Rosetta 只读诊断：`me:shire.peasant` 共 33 个，`MarketRegistry.resolve` 全部返回 `me_shire_farmer`；说明 NPC 类型和商人注册正常。右键无反应的原因是 `EntityInteract` 可能先被其它模组取消，监听器现已改为 `EventPriority.LOWEST, receiveCancelled=true`。
+
 专用服务端曾崩溃于 `NoClassDefFoundError: net/minecraft/client/gui/screens/Screen`：`AlignmentMessage` 在 common setup 类加载时直接引用客户端 `Minecraft`/`AlignmentScreen`。现已新增 `client/ClientPacketHandlers`，四个 S2C 包只引用该客户端处理器；扫描 jar 后确认 `net/minecraft/client` 只出现在 `client` 包。服务端 jar sha256 前缀 `346db8b5`，待服务器重启验收。
