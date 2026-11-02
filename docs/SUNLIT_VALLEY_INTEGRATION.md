@@ -191,7 +191,7 @@ mod：
 ## 8. 静态检查记录
 
 - node --check：svCustomers.js、svMeCustomers.js、svMastery.js、meMerchants.js 全部通过。
-- Node 静态执行（最小 global 样本）：120 条规则 / 105 个货池 / 15 条 NPC 规则，0 重复、0 个 ask≥market 的坏池；bread 为 22/14。
+- Node 静态执行（完整价格数组）：627 条规则 / 612 个货池 / 15 条 NPC 规则，0 重复、0 个 ask≥market 的坏池；bread 为 22/14。FTBQ 重点章节覆盖：crops 89/89、fishing 75/75、pantry 12/12、minerals 44/44。
 - gradle --no-daemon test build：通过（22 个单测，构建产物可生成）。
 - 未运行游戏；没有验证实体类型/职业名、物品 ID、货池实际生成、界面显示。
 - 服务端首次启动时建议检查 [SV-INTEGRATION] ... registered 日志和 SunlitMarket.factions()。

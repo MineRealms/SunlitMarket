@@ -55,7 +55,10 @@ if (typeof SunlitMarket !== 'undefined' && typeof global !== 'undefined' && glob
     ['tomato', 'me:tomato', 4, 0.92, 12],
     ['strawberry', 'me:strawberry', 4, 0.92, 12],
     ['mushroom', 'me:white_mushroom', 6, 0.92, 8],
-    ['soup', 'me:vegetable_soup', 1, 0.92, 55]
+    ['soup', 'me:vegetable_soup', 1, 0.92, 55],
+    ['bell_pepper', 'me:bell_pepper', 4, 0.92, 14],
+    ['garlic', 'me:garlic', 4, 0.92, 14],
+    ['onion', 'me:onion', 4, 0.92, 10]
   ])
 
   // Gondor: field rations and metal for the quartermaster.
@@ -64,7 +67,8 @@ if (typeof SunlitMarket !== 'undefined' && typeof global !== 'undefined' && glob
     ['meat_bowl', 'me:meat_bowl', 1, 0.92, 72],
     ['meat_skewer', 'me:cooked_meat_skewer', 2, 0.92, 42],
     ['egg_meal', 'me:meat_egg_meal', 1, 0.92, 70],
-    ['iron', 'minecraft:iron_ingot', 4, 0.90, 32]
+    ['iron', 'minecraft:iron_ingot', 4, 0.90, 32],
+    ['berry_pie', 'me:berry_pie', 1, 0.90, 48]
   ])
 
   // Rohan: hunt, fowl and horse feed.
@@ -74,7 +78,8 @@ if (typeof SunlitMarket !== 'undefined' && typeof global !== 'undefined' && glob
     ['swan', 'me:cooked_swan', 1, 0.90, 44],
     ['rat', 'me:cooked_rat', 2, 0.92, 16],
     ['horsefeed', 'me:sack_of_horsefeed', 1, 0.92, 30],
-    ['beef', 'minecraft:beef', 4, 0.92, 16]
+    ['beef', 'minecraft:beef', 4, 0.92, 16],
+    ['fish_stew', 'me:fish_stew', 1, 0.90, 65]
   ])
 
   // Lothlorien: herbs, mushrooms and pipeweed.

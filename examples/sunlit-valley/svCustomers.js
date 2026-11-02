@@ -24,8 +24,15 @@ if (typeof SunlitMarket !== 'undefined' && typeof global !== 'undefined' && glob
     if (profession) rule.profession = profession
     SunlitMarket.rule(rule)
   }
+  let seenPools = {}
   let addPool = (faction, key, item, count, ratio, fallback, extra) => {
+    let poolKey = faction + '|' + item
+    if (seenPools[poolKey]) return
+    seenPools[poolKey] = true
     let total = Math.max(1, Math.round(svValue(item, fallback) * count))
+    if (total < 2) return
+    let ask = Math.round(total * ratio)
+    if (ask >= total) ask = total - 1
     let rule = {
       type: 'pool',
       id: 'sv.' + svSlug(faction) + '.' + key,
@@ -34,7 +41,7 @@ if (typeof SunlitMarket !== 'undefined' && typeof global !== 'undefined' && glob
       count: count,
       baseValue: Math.max(1, Math.round(total * 0.60)),
       marketValue: total,
-      askPrice: Math.max(1, Math.round(total * ratio)),
+      askPrice: Math.max(1, ask),
       repGain: extra && extra.repGain !== undefined ? extra.repGain : 1
     }
     if (extra && extra.heat !== undefined) {
@@ -62,21 +69,30 @@ if (typeof SunlitMarket !== 'undefined' && typeof global !== 'undefined' && glob
   if (typeof global.crops !== 'undefined') {
     for (let i = 0; i < global.crops.length; i++) {
       let row = global.crops[i]
-      if (!row || !row.item || row.value < 4 || row.value > 128) continue
-      if (/(crate|bag|block|sack|basket|barrel|box|tray)/.test(row.item)) continue
-      let count = row.value <= 12 ? 6 : row.value <= 32 ? 4 : 2
+      if (!row || !row.item || row.value < 4 || row.value > 512) continue
+      if (/_(crate|bag|block|sack|basket|barrel|box|tray)(_|$)/.test(row.item)) continue
+      let count = row.value <= 16 ? 6 : row.value <= 64 ? 4 : 2
       addPool('society:farmer', 'crop_' + svSlug(row.item), row.item, count, 0.92, row.value)
     }
   }
+
+  // FTBQ crop entries that are not in global.crops' normal price list.
+  addPool('society:farmer', 'crop_etcetera_cotton_flower', 'etcetera:cotton_flower', 4, 0.92, 24)
 
   // ---- fish ------------------------------------------------------------------
   if (typeof global.fish !== 'undefined') {
     for (let i = 0; i < global.fish.length; i++) {
       let row = global.fish[i]
-      if (!row || !row.item || row.value < 16 || row.value > 80) continue
+      if (!row || !row.item || row.value < 4) continue
+      if (/_barrel(_|$)/.test(row.item)) continue
       addPool('society:fisher', 'fish_' + svSlug(row.item), row.item, 1, 0.92, row.value)
     }
   }
+
+  // FTBQ jelly fish are not in global.fish but have Shipping values.
+  addPool('society:fisher', 'fish_society_river_jelly', 'society:river_jelly', 1, 0.90, 128)
+  addPool('society:fisher', 'fish_society_ocean_jelly', 'society:ocean_jelly', 1, 0.90, 256)
+  addPool('society:fisher', 'fish_society_nether_jelly', 'society:nether_jelly', 1, 0.90, 512)
 
   // ---- logs / carpenter ------------------------------------------------------
   if (typeof global.logs !== 'undefined') {
@@ -121,6 +137,46 @@ if (typeof SunlitMarket !== 'undefined' && typeof global !== 'undefined' && glob
   addPool('society:market', 'truffle_oil', 'society:truffle_oil', 1, 0.88, 1536)
   addPool('society:market', 'wine', 'vinery:white_grape', 4, 0.92, 20)
   addPool('society:market', 'cooked_meal', 'farmersdelight:roast_chicken_block', 1, 0.90, 160)
+
+
+  // ---- FTBQ drinks -----------------------------------------------------------
+  // Brewery / herbalbrews / wine values are already Shipping Bin values.
+  // Cheap drinks stay with the market; rare bottles go to the travelling trader.
+  let addDrinkList = (list, prefix) => {
+    if (typeof list === 'undefined' || !list) return
+    for (let i = 0; i < list.length; i++) {
+      let row = list[i]
+      if (!row || !row.item || row.value < 8) continue
+      if (row.value <= 512) addPool('society:market', prefix + '_' + svSlug(row.item), row.item, 1, 0.90, row.value)
+      else if (row.value <= 8192) addPool('society:trader', 'luxury_' + prefix + '_' + svSlug(row.item), row.item, 1, 0.82, row.value)
+    }
+  }
+  addDrinkList(global.wines, 'wine')
+  addDrinkList(global.brews, 'brew')
+  addDrinkList(global.cocktails, 'cocktail')
+  addDrinkList(global.herbalBrews, 'tea')
+
+  // ---- FTBQ minerals / geodes / artefacts -----------------------------------
+  let addValueList = (list, faction, prefix, min, max, ratio, extra) => {
+    if (typeof list === 'undefined' || !list) return
+    for (let i = 0; i < list.length; i++) {
+      let row = list[i]
+      if (!row || !row.item || row.value < min || row.value > max) continue
+      let count = row.value <= 12 ? 8 : row.value <= 64 ? 4 : 1
+      addPool(faction, prefix + '_' + svSlug(row.item), row.item, count, ratio, row.value, extra)
+    }
+  }
+  addValueList(global.ore, 'society:blacksmith', 'ore', 4, 2560, 0.88)
+  addValueList(global.gems, 'society:trader', 'gem', 64, 2048, 0.80)
+  addValueList(global.geodeList, 'society:trader', 'geode', 32, 1024, 0.78)
+  addValueList(global.frozenGeodeList, 'society:trader', 'frozen_geode', 32, 1024, 0.78)
+  addValueList(global.magmaGeodeList, 'society:trader', 'magma_geode', 32, 1024, 0.78)
+  addValueList(global.miscGeologist, 'society:trader', 'curio', 16, 4096, 0.78)
+  addPool('society:blacksmith', 'mineral_limestone_pebble', 'society:limestone_pebble', 8, 0.90, 15)
+  addPool('society:blacksmith', 'mineral_mudstone', 'society:mudstone', 8, 0.90, 24)
+  addPool('society:trader', 'gem_prismarine_crystals', 'minecraft:prismarine_crystals', 4, 0.90, 20)
+  addValueList(global.artifacts, 'society:trader', 'artifact', 64, 4096, 0.78, { repGain: 2 })
+  addValueList(global.relics, 'society:trader', 'relic', 64, 4096, 0.78, { repGain: 2 })
 
   // ---- librarian -------------------------------------------------------------
   addPool('society:librarian', 'paper', 'minecraft:paper', 16, 0.92, 4)
