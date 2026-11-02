@@ -63,6 +63,6 @@ public final class CoreEvents {
         }
     }
     private static void logout(PlayerEvent.PlayerLoggedOutEvent e){if(e.getEntity() instanceof net.minecraft.server.level.ServerPlayer p)TradeSessions.close(p);}
-    private static void stopping(net.minecraftforge.event.server.ServerStoppingEvent e){com.society.sunlitmarket.audit.EconomyAudit.stop(e.getServer());}
+    private static void stopping(net.minecraftforge.event.server.ServerStoppingEvent e){com.society.sunlitmarket.market.MarketExport.writeQuietly(e.getServer());com.society.sunlitmarket.audit.EconomyAudit.stop(e.getServer());}
     private static void stopped(ServerStoppedEvent e){TradeSessions.clear();com.society.sunlitmarket.compat.MiddleEarthCompat.clear();com.society.sunlitmarket.audit.EconomyAudit.stop(e.getServer());}
 }

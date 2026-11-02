@@ -57,6 +57,10 @@ public final class CoreCommands {
                         c.getSource().sendSuccess(()->Component.literal(result),false);return 1;
                     } catch(java.time.DateTimeException ex){c.getSource().sendFailure(Component.literal("Expected UTC date YYYY-MM-DD"));return 0;}
                 }))))
+            .then(Commands.literal("market").then(Commands.literal("export").executes(c->{
+                try{var dir=com.society.sunlitmarket.market.MarketExport.write(c.getSource().getServer());c.getSource().sendSuccess(()->Component.literal("Exported to "+dir),false);return 1;}
+                catch(java.io.IOException ex){c.getSource().sendFailure(Component.literal("Export failed: "+ex.getMessage()));return 0;}
+            })))
             .then(Commands.literal("treasury")
                 .then(Commands.literal("status").executes(c->{
                     c.getSource().sendSuccess(()->Component.literal(com.society.sunlitmarket.treasury.Treasury.status(c.getSource().getServer()).toString()),false);return 1;

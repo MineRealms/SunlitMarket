@@ -129,9 +129,6 @@ public final class SunlitMarketMod {
         MinecraftServer server = event.getServer();
         if (server == null) return;
         long dayTime = server.overworld().getDayTime();
-        if (dayTime % MarketData.SAMPLE_EVERY == 0) {
-            MarketData.get(server).sample(dayTime, server);
-        }
         // KubeJS can override deposit rates mid-session; persist those edits without blocking.
         if (dayTime % 200L == 0L && com.society.sunlitmarket.deposit.DepositConfig.dirty()) {
             com.society.sunlitmarket.deposit.DepositConfig.save();

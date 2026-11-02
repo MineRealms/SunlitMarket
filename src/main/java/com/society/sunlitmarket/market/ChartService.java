@@ -2,7 +2,6 @@ package com.society.sunlitmarket.market;
 
 import net.minecraft.server.MinecraftServer;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /** Builds the chart payload. Server side only; never references a client class. */
@@ -34,25 +33,16 @@ public final class ChartService {
         view.name = id.isEmpty() ? "" : data.name(id);
         view.period = period;
         if (id.isEmpty()) return view;
-        view.lastBucket = data.lastBucket(id, period);
         view.current = data.value(id);
-        view.candles.addAll(withBuckets(data.candles(id, period, MAX_CANDLES), view.lastBucket));
-        return view;
-    }
-
-    /**
-     * MarketData stores bare OHLC quads; the wire format is {bucket, open, high, low, close} so the
-     * client can label the x axis without knowing the sampling rule. The newest candle sits at
-     * {@code lastBucket}.
-     */
-    static List<int[]> withBuckets(List<int[]> raw, long lastBucket) {
-        List<int[]> result = new ArrayList<>(raw.size());
-        for (int i = 0; i < raw.size(); i++) {
-            int[] candle = raw.get(i);
-            long bucket = lastBucket - (raw.size() - 1 - i);
-            result.add(new int[]{(int) bucket, candle[0], candle[1], candle[2], candle[3]});
+        try {
+            view.quote = data.quoteReference(id, server);
+        } catch (RuntimeException ex) {
+            view.quote = -1;
         }
-        return result;
+        // Candles carry their own bucket: periods without trades have no bar, so positions are not contiguous.
+        view.candles.addAll(data.candles(id, period, MAX_CANDLES));
+        view.lastBucket = view.candles.isEmpty() ? 0L : view.candles.get(view.candles.size() - 1)[0];
+        return view;
     }
 
     public static String json(MinecraftServer server, String id, int period) {

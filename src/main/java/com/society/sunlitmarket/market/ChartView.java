@@ -14,8 +14,9 @@ import java.util.List;
  * Wire payload for the read-only price chart. Lives in {@code market} (not {@code client}) so a
  * dedicated server can build and serialise it without ever loading a client class.
  *
- * <p>Candles are {@code {bucket, open, high, low, close}} with {@code bucket = dayTime / period},
- * so the client can label the x axis without a second round trip.
+ * <p>Candles are {@code {bucket, open, high, low, close, volume, weight, traders}} with
+ * {@code bucket = economy tick / period}; older servers send only the first five. Only periods
+ * with real trades have a candle, so consecutive entries need not be consecutive buckets.
  */
 public final class ChartView {
     public String id = "";
@@ -24,6 +25,8 @@ public final class ChartView {
     /** Bucket of the newest candle, so {@code bucket} values can be turned into day numbers. */
     public long lastBucket;
     public int current = -1;
+    /** Display-only shelf-quote basket for comparison, never a trade price; -1 when unknown. */
+    public int quote = -1;
     public List<Entry> indices = new ArrayList<>();
     public List<int[]> candles = new ArrayList<>();
 
@@ -42,6 +45,7 @@ public final class ChartView {
         o.addProperty("period", period);
         o.addProperty("lastBucket", lastBucket);
         o.addProperty("current", current);
+        o.addProperty("quote", quote);
         JsonArray list = new JsonArray();
         for (Entry entry : indices) {
             JsonObject e = new JsonObject();
@@ -74,6 +78,7 @@ public final class ChartView {
             view.period = o.has("period") ? o.get("period").getAsInt() : 24000;
             view.lastBucket = o.has("lastBucket") ? o.get("lastBucket").getAsLong() : 0L;
             view.current = o.has("current") ? o.get("current").getAsInt() : -1;
+            view.quote = o.has("quote") ? o.get("quote").getAsInt() : -1;
             if (o.has("indices") && o.get("indices").isJsonArray()) {
                 for (JsonElement e : o.getAsJsonArray("indices")) {
                     if (!e.isJsonObject()) continue;
@@ -90,8 +95,8 @@ public final class ChartView {
                     if (!e.isJsonArray()) continue;
                     JsonArray a = e.getAsJsonArray();
                     if (a.size() < 5) continue;
-                    int[] candle = new int[5];
-                    for (int i = 0; i < 5; i++) {
+                    int[] candle = new int[Math.min(8, a.size())];
+                    for (int i = 0; i < candle.length; i++) {
                         candle[i] = a.get(i).getAsInt();
                     }
                     view.candles.add(candle);

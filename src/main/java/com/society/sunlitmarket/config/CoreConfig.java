@@ -20,6 +20,7 @@ public final class CoreConfig {
     public static final ForgeConfigSpec.BooleanValue INSPECT_COUNTER, BRIBE_ENABLED, KILL_REWARDS;
     public static final ForgeConfigSpec.IntValue BRIBE_PRICE, BRIBE_REDUCTION, HAGGLE_FAILURE_LOSS, STOLEN_ALIGNMENT_LOSS, CONTRABAND_WANTED, KILL_LOSS, ENEMY_KILL_GAIN;
     public static final ForgeConfigSpec.BooleanValue TREASURY_ENABLED;
+    public static final ForgeConfigSpec.IntValue INDEX_OWNER_CAP;
     public static final ForgeConfigSpec.LongValue INITIAL_CASH, INITIAL_RESERVE, CASH_TARGET, CASH_CEILING, DAILY_REFILL, NPC_DAILY_BUDGET;
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -37,6 +38,8 @@ public final class CoreConfig {
         PRICE_MAX_MULT = b.defineInRange("priceMultiplierMax", 2.0D, 0.1D, 8D);
         SELL_OVERSTOCK = b.comment("Merchant shelf may be filled to this multiple of the restock level before further sales stop lowering prices.")
                 .defineInRange("sellOverstockCapacity", 3D, 1D, 16D);
+        INDEX_OWNER_CAP = b.comment("Most lots one owner (player or FTB party) can contribute to a single index candle's weight.",
+                "Volume beyond the cap still shows on the chart but cannot move a settlement price.").defineInRange("indexOwnerCapPerCandle", 64, 0, 1000000);
         b.pop().push("counter");
         COUNTER_ENABLED = b.define("enabled", true);
         COUNTER_RANGE = b.defineInRange("range", 8, 1, 32);

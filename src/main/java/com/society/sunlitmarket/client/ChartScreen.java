@@ -152,7 +152,7 @@ public final class ChartScreen extends Screen {
         int plotW = plotX1 - plotX0;
         int plotH = plotY1 - plotY0;
         if (candles.isEmpty() || plotW < 40 || plotH < 30) {
-            String empty = "暂无数据 · 服务器每 5 秒采样一次";
+            String empty = view.quote >= 0 ? "暂无成交 · 报价参考 " + view.quote : "暂无成交 · K 线只记录真实成交";
             g.drawString(font, empty, plotX0 + (plotW - font.width(empty)) / 2, plotY0 + plotH / 2 - 4,
                     Ui.TEXT_FAINT, false);
             return;
@@ -229,7 +229,12 @@ public final class ChartScreen extends Screen {
     }
 
     private void drawHover(GuiGraphics g, int[] candle, int mouseX, int mouseY) {
-        String[] lines = {
+        String[] lines = candle.length >= 8 ? new String[]{
+                bucketLabel(candle[0]),
+                "开 " + candle[1] + "    高 " + candle[2],
+                "低 " + candle[3] + "    收 " + candle[4],
+                "量 " + candle[5] + "    成交方 " + candle[7]
+        } : new String[]{
                 bucketLabel(candle[0]),
                 "开 " + candle[1] + "    高 " + candle[2],
                 "低 " + candle[3] + "    收 " + candle[4]
@@ -287,7 +292,8 @@ public final class ChartScreen extends Screen {
             }
         }
 
-        String hint = candles.isEmpty() ? "" : "共 " + candles.size() + " 根 · 红涨绿跌";
+        String hint = (candles.isEmpty() ? "" : "成交 " + candles.size() + " 根 · 红涨绿跌")
+                + (view.quote >= 0 ? (candles.isEmpty() ? "" : " · ") + "报价参考 " + view.quote : "");
         if (!hint.isEmpty()) {
             g.drawString(font, hint, contentRight - font.width(hint), y, Ui.TEXT_FAINT, false);
         }

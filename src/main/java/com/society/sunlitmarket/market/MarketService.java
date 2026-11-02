@@ -26,13 +26,18 @@ public final class MarketService {
         Offer offer = merchant.offers.get(index);
         return offer.id.isBlank() || offer.legacyIndex < 0 ? null : merchant.id + '#' + offer.legacyIndex;
     }
-    public record Quote(int buy, int sell) {}
+    /** {@code marketRatio} is the impersonal factor (modifiers x scarcity) without the player's own tier/wanted terms. */
+    public record Quote(int buy, int sell, double marketRatio) {
+        public Quote(int buy, int sell) { this(buy, sell, 1D); }
+    }
+    /** Coins and fixed-price offers never move with the market, so they never feed an index. */
+    static boolean fixed(Offer offer) { return offer.fixedPrice || Currency.coinValue(offer.item) > 0; }
     public static Quote quote(ServerPlayer p, Merchant m, Offer offer) { return quote(p, m, offer, -1); }
     public static Quote quote(ServerPlayer p, Merchant m, Offer offer, int index) {
         int alignment = AlignmentData.get(p.server).get(p, m.faction);
         var tier = SunlitMarketConfig.tierFor(alignment);
         double scale = PriceModifiers.get(m.id, offer.item);
-        boolean fixed = offer.fixedPrice || Currency.coinValue(offer.item) > 0;
+        boolean fixed = fixed(offer);
         double penalty = !fixed && CoreConfig.WANTED_PRICES.get()
                 ? 1D + AlignmentData.get(p.server).wanted(p) * CoreConfig.WANTED_SURCHARGE.get() : 1D;
         double scarcity = 1.0D;
@@ -44,7 +49,7 @@ public final class MarketService {
         int buy = TradeMath.price(PriceModifiers.apply(offer.buy, fixed ? 1D : scale), fixed ? 1D : tier.buy * penalty * scarcity);
         int sell = TradeMath.price(PriceModifiers.apply(offer.sell, fixed ? 1D : scale), fixed ? 1D : tier.sell * scarcity / penalty);
         if (CoreConfig.PREVENT_ARBITRAGE.get() && !offer.allowArbitrage && buy > 0) sell = Math.min(sell, buy);
-        return new Quote(buy, sell);
+        return new Quote(buy, sell, fixed ? 1D : scale * scarcity);
     }
     public static MarketView view(ServerPlayer p, Merchant m) {
         MarketView v = new MarketView(); v.merchantId = m.id; v.merchantName = m.name; v.faction = m.faction;
@@ -130,6 +135,9 @@ public final class MarketService {
                         () -> Currency.settle(p, p.getInventory(), null, Currency.item(offer.item), count, total, "MARKET_SELL"));
         if (!result.isEmpty()) return result;
         if (action == ACTION_BUY) Treasury.receive(p.server, TreasuryData.Account.CASH, total, "MARKET_BUY");
+        if (!fixed(offer)) MarketData.get(p.server).recordFill(new TradeFill(com.society.sunlitmarket.core.EconomyClock.tick(p.server),
+                m.id, offer.item, action == ACTION_BUY ? "BUY" : "SELL", unit, qty, q.marketRatio(), FtbTeamsCompat.owner(p).key()),
+                CoreConfig.INDEX_OWNER_CAP.get());
         if (action == ACTION_BUY) { stock.take(key, offer.stock, qty); limits.add(p, key, qty); }
         if (action == ACTION_SELL && offer.stock >= 0) { stock.add(key, offer.stock, qty, CoreConfig.SELL_OVERSTOCK.get()); }
         if (reward > 0) AlignmentData.get(p.server).add(p, m.faction, reward);
