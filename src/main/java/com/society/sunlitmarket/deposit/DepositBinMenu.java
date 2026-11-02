@@ -91,6 +91,9 @@ public final class DepositBinMenu extends AbstractContainerMenu {
         if (p != player) return;
         DepositBinBlockEntity found = bin();
         if (found == null) return;
+        // Clear the exchange note first: the footer prefers it over the bin's own message, so a
+        // stale "存入 …" would otherwise hide the payout result.
+        walletMessage = "";
         found.collect(p);
         sync();
     }

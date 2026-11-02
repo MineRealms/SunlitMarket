@@ -216,15 +216,17 @@ public final class DepositBinScreen extends AbstractContainerScreen<DepositBinMe
         Ui.hline(g, left + 1, walletY, panelW - 2, Ui.EDGE_SOFT);
         Ui.hline(g, left + 1, walletY + WALLET_H - 1, panelW - 2, Ui.EDGE_SOFT);
 
+        int textWidth = depositX - left - 24;
         String balance = enabled
                 ? String.format(Locale.ROOT, "钱包 %,d spur", longOf("wallet"))
                 : "钱包未启用";
-        g.drawString(font, balance, left + 12, walletY + 3, enabled ? Ui.GOLD : Ui.TEXT_FAINT, false);
+        g.drawString(font, font.plainSubstrByWidth(balance, textWidth),
+                left + 12, walletY + 3, enabled ? Ui.GOLD : Ui.TEXT_FAINT, false);
 
         String note = enabled
                 ? "兑换手续费 " + intOf("feePercent") + "% · 最低取出 " + intOf("minWithdraw")
                 : "在 deposit_values.json 中开启 wallet.enabled";
-        g.drawString(font, font.plainSubstrByWidth(note, withdrawX - left - 24),
+        g.drawString(font, font.plainSubstrByWidth(note, textWidth),
                 left + 12, walletY + 13, Ui.TEXT_FAINT, false);
 
         boolean hoverDeposit = Ui.hit(mouseX, mouseY, depositX, walletButtonY, WALLET_BTN_W, WALLET_BTN_H);
