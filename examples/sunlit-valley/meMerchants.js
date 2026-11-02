@@ -81,7 +81,9 @@ if (typeof SunlitMarket !== 'undefined' && Platform.isLoaded('me')) {
     name: '洛汗猎手',
     faction: 'me:rohan',
     tag: 'sunlitmarket.me.rohan_hunter',
-    npcType: 'me:rohan.peasant',
+    // The shipped ME faction table classifies this type as both CIVILIAN and MILITIA.
+    // Keep the merchant mapping, but the customer rank resolver deliberately returns UNKNOWN.
+    npcType: 'me:rohan.militia',
     offers: [
       { item: 'me:cooked_goose', count: 1, buy: 40, sell: 28 },
       { item: 'me:cooked_duck', count: 1, buy: 40, sell: 28 },
@@ -99,7 +101,7 @@ if (typeof SunlitMarket !== 'undefined' && Platform.isLoaded('me')) {
     name: '萝林草药师',
     faction: 'me:lothlorien',
     tag: 'sunlitmarket.me.lothlorien_herbalist',
-    npcType: 'me:lothlorien.civilian',
+    npcType: 'me:lothlorien.sentinel',
     offers: [
       { item: 'me:strawberries', count: 1, buy: 22, sell: 15, stock: 16 },
       { item: 'me:ghostshroom', count: 1, buy: 20, sell: 12, stock: 12 },
