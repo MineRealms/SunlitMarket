@@ -217,7 +217,7 @@ public final class SunlitMarketMod {
         }
         Merchant merchant = nearest == null ? null : MarketRegistry.resolve(nearest);
         if (merchant == null) {
-            source.sendFailure(Component.literal("No merchant within " + radius + " blocks"));
+            source.sendFailure(Component.literal("No merchant within " + radius + " blocks; try /sunlitmarket near " + (radius * 2)));
             return 0;
         }
         MarketService.open(player, merchant, nearest);
@@ -230,8 +230,8 @@ public final class SunlitMarketMod {
         event.getDispatcher().register(Commands.literal("sunlitmarket")
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("near")
-                        .executes(ctx -> openNearest(ctx.getSource(), 12))
-                        .then(Commands.argument("radius", IntegerArgumentType.integer(1, 64))
+                        .executes(ctx -> openNearest(ctx.getSource(), 32))
+                        .then(Commands.argument("radius", IntegerArgumentType.integer(1, 128))
                                 .executes(ctx -> openNearest(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "radius")))))
                 .then(Commands.literal("open")
                         .then(Commands.argument("merchant", StringArgumentType.string())
