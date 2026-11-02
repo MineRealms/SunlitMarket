@@ -2,7 +2,7 @@
 
 ## Scope
 
-This project owns the trading engine and optional ME/FTB adapters. It does not install Sunlit Valley recipes, production prices, quest gates or server releases. Player-to-player shop customers are deferred; current requests are NPCs selling goods to a player-operated counter.
+This project owns the trading engine and optional ME/FTB adapters. It does not install Sunlit Valley recipes, production prices, quest gates or server releases. Player-to-player shop customers are deferred; current requests are NPCs selling goods to a player-operated counter. The pack-side economy/price analysis lives in `SUNLIT_VALLEY_INTEGRATION.md`.
 
 ## Configuration
 
@@ -10,6 +10,7 @@ This project owns the trading engine and optional ME/FTB adapters. It does not i
 - `config/sunlitmarket-core.toml`: team sharing, refusal threshold, same-quote price protection, counter limits and crime policy.
 - `config/sunlitmarket/merchants.json`: legacy merchant array or `{ "merchants": [...] }`.
 - `config/sunlitmarket/rules.json`: NPC identities, explicit request pools and contraband laws. See `examples/core-rules.json`.
+- NPC identity rules accept `tag`, `npcType`, `entity` (registry id) and `profession` (villager profession). `entity` + `profession` is intended for pack NPCs such as vanilla villagers; `profession` alone matches any villager with that profession.
 - Data packs: `data/<namespace>/sunlitmarket/factions/*.json`; the optional ME adapter reads `data/me/me/faction/*.json` without importing ME classes.
 
 Use `/reload` for data packs and server scripts. `/sunlitmarket reload` reloads local JSON and faction/config snapshots; it does not re-evaluate KubeJS scripts. `SunlitMarket.reload()` retains its legacy merchant-JSON meaning. Reload invalidates network sessions: close and reopen the UI. Existing request prices are snapshots; requests are rechecked against current identity, pool existence, expiry and distance before settlement.

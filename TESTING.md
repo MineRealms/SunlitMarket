@@ -237,3 +237,16 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - FTB Teams 真实双人共享/退队/解散；当前无 FTB 运行环境。
 - Numismatics 银行/找零：-DEV 未安装该 mod。
 - 保存退出重进后的完整 GUI 行为；SavedData 的序列化已由单测与自检覆盖。
+
+---
+
+## 9. Sunlit Valley 深度联动（2026-11-02，仅静态）
+
+按用户要求**没有启动游戏/服务器测试**（本地 400+ mod，单人世界不可进入）。已完成：
+
+- `SUNLIT_VALLEY_INTEGRATION.md`：价格锚、三类价格面、职业/派系货池、阶段桥和不受影响的 GT 配方边界。
+- `svCustomers.js` / `svMeCustomers.js` / `svMastery.js` / `meMerchants.js`：`node --check` 全通过。
+- Node 静态执行最小样本：120 条规则 / 105 个货池 / 15 条 NPC 规则；0 重复、0 个 `askPrice >= marketValue`；bread 22/14。
+- `gradle --no-daemon test build` 通过，生成 jar 并同步主客户端 / -DEV / mirror（sha256 前缀 `68b67749`）。
+
+待服务器验收：实际实体职业名、物品 ID、货池生成、柜台 UI、ME 商人收购条目、mastery 阶段同步。

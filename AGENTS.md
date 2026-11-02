@@ -16,6 +16,8 @@ Sunlit Market 是给 Sunlit Valley 整合包写的 NPC 交易/声望附属 mod�
 - 当铺核心层（S2–S6：FTB 可选队伍、柜台顾客、赃物/通缉、执法、脚本事件）已在 `core-implementation` 分支实现，
   设计/行为见 `docs/CORE.md`。**22 个单测 + 22 项 -DEV 集成断言通过**（`TESTING.md` 第 8 节）；
   FTB 真实双人队伍、Numismatics 银行、柜台/商人 GUI 视觉仍未验证（GUI 由用户亲自打开，勿用 Rosetta 操作界面）。
+- **Sunlit Valley 深度联动**：价格锚、Sunlit 职业顾客、ME 派系顾客、阶段桥和 ME 商人收购见
+  `docs/SUNLIT_VALLEY_INTEGRATION.md`。脚本已同步到主客户端 / -DEV / mirror；**只做了静态检查和构建，未启动服务器**，等待服务器验收。
 
 ## 2. 当前构建 / 部署
 
