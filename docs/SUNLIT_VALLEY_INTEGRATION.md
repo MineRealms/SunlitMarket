@@ -193,7 +193,7 @@ svMeCustomers.js 给 ME 平民补货池，身份仍由 NpcData.Type 的原生 fa
 | me:brigand / me:isengard / me:mordor | 便宜赃物（钻石、金、下界合金碎片、火药），带 heat/wanted |
 | me:moria / me:goblin_town / me:hobgoblin_tribes.gundabad / me:wild_goblins | 矿石、煤、赃物 |
 
-另加显式平民身份规则（me:shire.peasant 等），避免未来 ME 派系表 rank 改动导致顾客消失。
+显式身份规则只覆盖出货 jar 中确认且不与战斗 rank 冲突的 type（例如 `me:shire.peasant`、`me:gondor.peasant`、`me:dale.peasant`、`me:lothlorien.sentinel`、`me:longbeards.erebor.peasant/miner`、`me:isengard.snaga`、`me:mordor.snaga`）。`me:rohan.militia`、`me:brigand.thug`、`me:wild_goblins.gatherer`、`me:woodland_realm.ranger` 在 rank pool 中有冲突，默认不强制作为顾客；身份和pool仍以 `FactionRelations`/`MarketRules` 的实际快照为准。
 
 ## 6. 阶段桥
 

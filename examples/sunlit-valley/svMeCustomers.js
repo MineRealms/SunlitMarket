@@ -39,13 +39,21 @@ if (typeof SunlitMarket !== 'undefined' && typeof global !== 'undefined' && glob
     }
   }
 
-  // Explicit civilian types make the customer rule independent of a future
-  // Middle-earth faction-table rank change.
+  // Explicit, non-conflicting CIVILIAN types make the customer rule independent
+  // of a future faction-table rank change. The shipped ME jar is authoritative:
+  // rohan.militia, brigand.thug, wild_goblins.gatherer and woodland_realm.ranger
+  // also occur in combat pools, so they are deliberately NOT forced into CIVILIAN.
   addNpc('shire_peasant', 'me:shire', 'me:shire.peasant')
   addNpc('gondor_peasant', 'me:gondor', 'me:gondor.peasant')
-  addNpc('rohan_peasant', 'me:rohan', 'me:rohan.peasant')
-  addNpc('lothlorien_civilian', 'me:lothlorien', 'me:lothlorien.civilian')
+  addNpc('dale_peasant', 'me:dale', 'me:dale.peasant')
+  addNpc('lothlorien_sentinel', 'me:lothlorien', 'me:lothlorien.sentinel')
+  addNpc('erebor_peasant', 'me:longbeards.erebor', 'me:longbeards.erebor.peasant')
   addNpc('erebor_miner', 'me:longbeards.erebor', 'me:longbeards.erebor.miner')
+  addNpc('goblin_town_goblin', 'me:goblin_town', 'me:goblin_town.goblin')
+  addNpc('gundabad_goblin', 'me:hobgoblin_tribes.gundabad', 'me:hobgoblin_tribes.gundabad.goblin')
+  addNpc('isengard_snaga', 'me:isengard', 'me:isengard.snaga')
+  addNpc('mordor_snaga', 'me:mordor', 'me:mordor.snaga')
+  addNpc('moria_goblin', 'me:moria', 'me:moria.goblin')
 
   // Shire: garden produce and simple cooked food.
   addMany('me:shire', [
