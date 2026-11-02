@@ -12,35 +12,19 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Converts everything the bin accepts into spur. Server-only: no client class is referenced here.
+ * Turns everything the bin accepts into spur. All rates come from {@link DepositConfig}; the only
+ * built-in rule is "an item with no configured price is worth what the pawnshop would pay for it".
  *
- * <p>Items are priced with the pawnshop's own buy-back table, so the bin never invents a price the
- * merchants would not pay. Everything else uses a deliberately poor rate - energy especially, since
- * GT electricity is the one resource a late-game player can produce without limit.
+ * <p>Server-side only: no client class is referenced here.
  */
 public final class DepositValues {
-    /** 1 spur per 50,000 FE. A plasma turbine would still need minutes to earn pocket change. */
-    private static final int FE_PER_SPUR = 50_000;
-    /** 1 spur per 2,000 mana. */
-    private static final int MANA_PER_SPUR = 2_000;
-    /** 1 spur per point of essentia. */
-    private static final int ESSENTIA_PER_SPUR = 1;
-    /** Spur per bucket of fluid, by fluid id. Anything unlisted is worth a single spur. */
-    private static final Map<String, Integer> FLUID_RATES = Map.of(
-            "gtceu:oil", 6,
-            "gtceu:heavy_fuel", 6,
-            "gtceu:diesel", 8,
-            "gtceu:gasoline", 10,
-            "gtceu:sulfuric_acid", 3,
-            "gtceu:nitric_acid", 3);
-
-    private static Map<String, Integer> itemUnit = Map.of();
+    private static Map<String, Integer> marketUnit = Map.of();
     private static long stamp = Long.MIN_VALUE;
 
     private DepositValues() {
     }
 
-    /** Rebuilds the item table when the merchant registry changes. */
+    /** Rebuilds the merchant price table when the registry changes. */
     public static synchronized void refresh() {
         long version = MarketRegistry.version();
         if (version == stamp) return;
@@ -52,39 +36,57 @@ public final class DepositValues {
                 units.merge(offer.item, unit, Math::max);
             }
         }
-        itemUnit = units;
+        marketUnit = units;
         stamp = version;
     }
 
-    /** Spur per single item, or 0 when no merchant would buy it. */
+    /** Spur per single item: the config wins, then the pawnshop table, then 0 (not accepted). */
     public static int itemUnit(String id) {
         if (id == null || id.isEmpty()) return 0;
+        Integer configured = DepositConfig.itemPrice(id);
+        if (configured != null) return configured;
         refresh();
-        return itemUnit.getOrDefault(id, 0);
+        return marketUnit.getOrDefault(id, 0);
     }
 
     public static int itemValue(ItemStack stack) {
-        if (stack.isEmpty()) return 0;
+        if (stack.isEmpty() || !DepositConfig.accepts("item")) return 0;
         String id = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
         return itemUnit(id) * stack.getCount();
     }
 
     public static int fluidValue(FluidStack stack) {
-        if (stack.isEmpty()) return 0;
-        String id = BuiltInRegistries.FLUID.getKey(stack.getFluid()).toString();
-        int perBucket = FLUID_RATES.getOrDefault(id.toLowerCase(Locale.ROOT), 1);
+        if (stack.isEmpty() || !DepositConfig.accepts("fluid")) return 0;
+        String id = BuiltInRegistries.FLUID.getKey(stack.getFluid()).toString().toLowerCase(Locale.ROOT);
+        int perBucket = DepositConfig.fluidRate(id);
         return (int) Math.min(Integer.MAX_VALUE, (long) perBucket * stack.getAmount() / 1000L);
     }
 
     public static int energyValue(int fe) {
-        return Math.max(0, fe) / FE_PER_SPUR;
+        if (fe <= 0 || !DepositConfig.accepts("energy")) return 0;
+        return fe / DepositConfig.fePerSpur();
     }
 
     public static int manaValue(int mana) {
-        return Math.max(0, mana) / MANA_PER_SPUR;
+        if (mana <= 0 || !DepositConfig.accepts("mana")) return 0;
+        return mana / DepositConfig.manaPerSpur();
     }
 
+    /** Flat rate, used when the aspect is unknown. */
     public static int essentiaValue(int amount) {
-        return Math.max(0, amount) / ESSENTIA_PER_SPUR;
+        if (amount <= 0 || !DepositConfig.accepts("essentia")) return 0;
+        return amount / DepositConfig.pointsPerSpur();
+    }
+
+    /** Per-aspect rate, so a config can make one aspect worth more than another. */
+    public static int essentiaValue(Map<String, Integer> aspects) {
+        if (aspects == null || aspects.isEmpty() || !DepositConfig.accepts("essentia")) return 0;
+        long total = 0;
+        for (Map.Entry<String, Integer> entry : aspects.entrySet()) {
+            int amount = entry.getValue() == null ? 0 : entry.getValue();
+            if (amount <= 0) continue;
+            total += (long) amount / Math.max(1, DepositConfig.aspectRate(entry.getKey()));
+        }
+        return (int) Math.min(Integer.MAX_VALUE, total);
     }
 }
