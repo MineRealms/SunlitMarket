@@ -136,9 +136,23 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
     public String collect(ServerPlayer player) {
         int total = value();
         if (total <= 0) return "没有可回收的内容";
+        long today = today();
+        BuybackLedger ledger = DepositConfig.buybackEnabled() ? BuybackLedger.get(level.getServer()) : null;
+        if (ledger != null) {
+            long remaining = ledger.remaining(player, today);
+            if (total > remaining) {
+                // All or nothing: paying part of it would either destroy goods or strand a
+                // half-drained stack, and the player can simply come back tomorrow.
+                lastMessage = remaining <= 0
+                        ? "今日回收额度已用尽（本次需 " + total + "）"
+                        : "今日额度只剩 " + remaining + "，本次需 " + total + "；明日再来";
+                return lastMessage;
+            }
+        }
         if (com.society.sunlitmarket.wallet.Wallet.enabled()) {
             com.society.sunlitmarket.wallet.Wallet.add(player, total);
             drain();
+            if (ledger != null) ledger.record(player, today, total);
             lastPayout = total;
             lastMessage = "回收 +" + total + " → 钱包 " + com.society.sunlitmarket.wallet.Wallet.balance(player);
             setChanged();
@@ -147,10 +161,22 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
         String error = Currency.settle(player, null, null, ItemStack.EMPTY, 0, total);
         if (error != null && !error.isEmpty()) return error;
         drain();
+        if (ledger != null) ledger.record(player, today, total);
         lastPayout = total;
         lastMessage = "回收 +" + total + " spur";
         setChanged();
         return lastMessage;
+    }
+
+    /** The server's own day counter; never the wall clock. */
+    private long today() {
+        return level == null ? 0L : level.getDayTime() / 24000L;
+    }
+
+    /** Spur this player may still be paid today, or -1 when the budget is off/uncapped. */
+    public long buybackRemaining(ServerPlayer player) {
+        if (!DepositConfig.buybackEnabled() || level == null || level.getServer() == null) return -1L;
+        return BuybackLedger.get(level.getServer()).remaining(player, today());
     }
 
     /** Empties every intake port; only ever called once the payout is secured. */

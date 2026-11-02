@@ -367,6 +367,24 @@ public final class SunlitMarketBinding {
         return -1;
     }
 
+    /** SunlitMarket.depositBudget(100000, 20000) - daily world cap and per-player cap; 0 = uncapped. */
+    public void depositBudget(int dailyCap, int playerCap) {
+        try {
+            com.society.sunlitmarket.deposit.DepositConfig.setBuyback(dailyCap, playerCap);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositBudget failed", t);
+        }
+    }
+
+    /** SunlitMarket.depositBudgetEnabled(false) turns the daily cap off entirely. */
+    public void depositBudgetEnabled(boolean enabled) {
+        try {
+            com.society.sunlitmarket.deposit.DepositConfig.setBuybackEnabled(enabled);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositBudgetEnabled failed", t);
+        }
+    }
+
     /** Re-reads deposit_values.json; script overrides made before the call are discarded. */
     public void depositReload() {
         try {

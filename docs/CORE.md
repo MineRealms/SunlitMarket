@@ -11,7 +11,7 @@ This project owns the trading engine and optional ME/FTB adapters. It does not i
 - `trade.dynamicPricing` (default on) makes stocked shelves price by inventory: one scarcity factor `clamp((initial/max(stock,1))^elasticity, min, max)` scales BOTH directions of the same offer. Buying drains the shelf and raises prices; selling refills it (capped at `sellOverstockCapacity` x restock level) and lowers them. Unlimited offers (`stock: -1`) and fixed/coin offers keep fixed prices. Shelf stock still resets at the daily roll, which acts as the mean-reversion step.
 - `config/sunlitmarket/merchants.json`: legacy merchant array or `{ "merchants": [...] }`.
 - `config/sunlitmarket/rules.json`: NPC identities, explicit request pools and contraband laws. See `examples/core-rules.json`.
-- `config/sunlitmarket/deposit_values.json`: the acceptance bin's price table plus the `wallet` block. Written with defaults on first start; see §Acceptance bin and §Virtual wallet.
+- `config/sunlitmarket/deposit_values.json`: the acceptance bin's price table plus the `wallet` and `buyback` blocks. Written with defaults on first start; see §Acceptance bin and §Virtual wallet.
 - NPC identity rules accept `tag`, `npcType`, `entity` (registry id) and `profession` (villager profession). `entity` + `profession` is intended for pack NPCs such as vanilla villagers; `profession` alone matches any villager with that profession.
 - Data packs: `data/<namespace>/sunlitmarket/factions/*.json`; the optional ME adapter reads `data/me/me/faction/*.json` without importing ME classes.
 
@@ -77,7 +77,7 @@ Optional mods are optional at runtime, not just at compile time: the Thaumcraft 
 
 Client/server split: the block, block entity, menu and valuation live outside `client/`; only `DepositBinScreen` touches `net.minecraft.client.*`. State reaches the screen as `DepositStateMessage` (S2C id 8), and the three buttons ride `clickMenuButton(0..2)` (collect / deposit cash / withdraw all) so no C2S packet is needed.
 
-Known gap: the bin still pays without a daily budget. That is the `BuybackBudgetManager` from `ECONOMY_MODEL_V2.md` §7 and is not implemented yet.
+Daily budget: every payout is booked in `BuybackLedger` (SavedData `sunlitmarket_buyback`) against the server's own `getDayTime() / 24000`, never the wall clock - a restart, a time zone or a clock change would otherwise open a second budget for the same day. `buyback.dailyCap` is the world-wide ceiling, `buyback.playerCap` the per-player one; 0 disables a cap and `buyback.enabled: false` turns the whole thing off. A collect larger than what is left is refused whole rather than paid in part, because a partial payment would either destroy goods or strand a half-drained stack; the screen shows the remainder next to 合计 and greys the button out. This is the `BuybackBudgetManager` of `ECONOMY_MODEL_V2.md` §7 reduced to the part that does not need the cash-reserve rewrite.
 
 ## Virtual wallet
 
@@ -112,7 +112,7 @@ Keep existing `SunlitMarket` methods and legacy reputation aliases. New examples
 - `rule({...})`, `clearRules()` register/clear script rules.
 - `owner(player)`, `identity(entity)`, `regionWeight(entity, faction)` expose adapter results.
 - `heat(stack)`, `markStolen(stack, heat)` manage explicit provenance.
-- `depositPrice(itemId, spur)`, `depositFluidRate(fluidId, perBucket)` and `depositAccept(channel, allowed)` override the acceptance-bin table at runtime; `depositItemValue(itemId)` reads the effective rate and `depositReload()` re-reads the file. Overrides are flushed back to `deposit_values.json` on the next save tick.
+- `depositBudget(dailyCap, playerCap)` and `depositBudgetEnabled(false)` retune the daily buyback ceiling; `depositPrice(itemId, spur)`, `depositFluidRate(fluidId, perBucket)` and `depositAccept(channel, allowed)` override the acceptance-bin table at runtime; `depositItemValue(itemId)` reads the effective rate and `depositReload()` re-reads the file. Overrides are flushed back to `deposit_values.json` on the next save tick.
 - `wallet(player)`, `walletAdd`, `walletTake`, `walletDeposit(player)` and `walletWithdraw(player, amount)` expose the virtual account.
 - `playerFaction(player)` returns a cached on-disk ME allegiance snapshot or `UNKNOWN`; it is not a live authority and never writes ME SavedData.
 - `SunlitMarketEvents.beforeRequest/afterRequest/beforeTrade/afterTrade/beforeInspection/afterInspection` expose `event.data`.

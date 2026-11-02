@@ -320,3 +320,13 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - GUI：五行入口下多了一条钱包带（余额 / 手续费 / 最低取出 + 存入、取出按钮），按钮走 `clickMenuButton(1|2)`，不需要额外 C2S 包。**排版未做界面验收**，需要人工开一次看。
 - 未验证：`wallet.enabled=false` 时接受仓回落 `Currency.settle` 的路径（代码有分支，DEV 没跑）。
 - 已知瑕疵：小额兑换会被整数除法吃掉手续费（10 spur 存进去仍是 10，5% 取整为 0），只有 ≥20 spur 才真正扣到 1。
+
+## 15. 每日回收预算（2026-11-03，-DEV 实例实测）
+
+- `BuybackLedger`（SavedData `sunlitmarket_buyback`）记 `{Day, Spent, Players:{uuid:amount}}`，日界线取 `Level.getDayTime() / 24000`，**不用**墙钟——重启、时区、改时间都开不出第二个预算。
+- 配置在 `deposit_values.json` 的 `buyback`：`enabled` / `dailyCap`（世界级，默认 100000）/ `playerCap`（每人，默认 20000），0 表示不设上限。
+- 实测：初始 `budget=20000`（世界 100000 与每人 20000 取小）；`setBuyback(100,100)` 后 `collect` 被整笔拒绝 → `今日额度只剩 100，本次需 999；明日再来`，钱包 591 不变、仓内仍剩 999；`setBuyback(2000,2000)` 后同一笔成功 → 钱包 1590、仓清零、剩余额度 1001；恢复默认后 `budget=19001`（今天已花 999）。
+- 整笔拒绝而不是按剩余额度部分支付：部分支付要么销毁货物，要么留下半格残料，而玩家明天再来就行。界面在「合计」右侧显示 `今日剩 N`，额度不够时按钮置灰。
+- 存档往返实测（反射调 `save`/`load`）：`{Day:40L, Players:{<uuid>:999L}, Spent:999L}` → 重新 load 后 `remaining=19001`（与在线实例一致），`today+1` 时 `remaining=20000`（跨日归零）。
+- 注意：`/save-all` 需要权限 4，单人 op（2 级）跑不了，控制台桥也跑不了，所以没能在会话内看到 `.dat` 落盘；写入路径与 `MarketData` 完全相同（`DimensionDataStorage.computeIfAbsent`），后者已在多次重启中验证。
+- 未验证：跨日真实滚动（需要 `time add 24000` 且预算已花掉），只验证了 `load` 后 `today+1` 的逻辑分支。

@@ -251,8 +251,17 @@ public final class DepositBinScreen extends AbstractContainerScreen<DepositBinMe
         String label = "合计 " + total + " spur";
         g.drawString(font, label, left + 12, footerY + 10, total > 0 ? Ui.GOLD : Ui.TEXT_FAINT, false);
 
+        // Daily buyback budget: absent when the ledger is off or uncapped.
+        if (state.has("buybackRemaining")) {
+            long left = longOf("buybackRemaining");
+            String budget = left <= 0 ? "今日额度已用尽" : String.format(Locale.ROOT, "今日剩 %,d", left);
+            int color = left <= 0 ? Ui.UP : total > left ? Ui.GOLD : Ui.TEXT_FAINT;
+            g.drawString(font, budget, buttonX - 8 - font.width(budget), footerY + 10, color, false);
+        }
+
+        boolean affordable = total > 0 && (!state.has("buybackRemaining") || total <= longOf("buybackRemaining"));
         boolean hovered = Ui.hit(mouseX, mouseY, buttonX, buttonY, 64, 18);
-        Ui.button(g, font, "回收", buttonX, buttonY, 64, 18, hovered, total > 0, Ui.BTN, Ui.BTN_HOVER, Ui.GOLD);
+        Ui.button(g, font, "回收", buttonX, buttonY, 64, 18, hovered, affordable, Ui.BTN, Ui.BTN_HOVER, Ui.GOLD);
     }
 
     @Override
@@ -262,7 +271,8 @@ public final class DepositBinScreen extends AbstractContainerScreen<DepositBinMe
                 onClose();
                 return true;
             }
-            if (Ui.hit(mouseX, mouseY, buttonX, buttonY, 64, 18) && intOf("total") > 0) {
+            if (Ui.hit(mouseX, mouseY, buttonX, buttonY, 64, 18) && intOf("total") > 0
+                    && (!state.has("buybackRemaining") || intOf("total") <= longOf("buybackRemaining"))) {
                 press(0);
                 return true;
             }

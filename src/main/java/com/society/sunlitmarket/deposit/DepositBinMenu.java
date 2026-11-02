@@ -110,6 +110,8 @@ public final class DepositBinMenu extends AbstractContainerMenu {
         state.addProperty("walletEnabled", DepositConfig.walletEnabled());
         state.addProperty("feePercent", DepositConfig.exchangeFeePercent());
         state.addProperty("minWithdraw", DepositConfig.minWithdraw());
+        long budget = found.buybackRemaining(serverPlayer);
+        if (budget >= 0) state.addProperty("buybackRemaining", budget);
         if (!walletMessage.isEmpty()) state.addProperty("walletMessage", walletMessage);
         SunlitMarketMod.CHANNEL.send(PacketDistributor.PLAYER.with(() -> serverPlayer),
                 new DepositStateMessage(state.toString()));

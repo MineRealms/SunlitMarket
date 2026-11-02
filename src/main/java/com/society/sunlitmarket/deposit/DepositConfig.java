@@ -45,6 +45,9 @@ public final class DepositConfig {
     private static boolean walletEnabled = true;
     private static int exchangeFeePercent = 5;
     private static int minWithdraw = 10;
+    private static boolean buybackEnabled = true;
+    private static int buybackDailyCap = 100_000;
+    private static int buybackPlayerCap = 20_000;
 
     private static boolean loaded;
     private static boolean dirty;
@@ -105,6 +108,9 @@ public final class DepositConfig {
         walletEnabled = true;
         exchangeFeePercent = 5;
         minWithdraw = 10;
+        buybackEnabled = true;
+        buybackDailyCap = 100_000;
+        buybackPlayerCap = 20_000;
         FLUIDS.put("gtceu:diesel", 8);
         FLUIDS.put("gtceu:gasoline", 10);
         FLUIDS.put("gtceu:oil", 6);
@@ -151,6 +157,11 @@ public final class DepositConfig {
         walletEnabled = flag(wallet, "enabled", true);
         exchangeFeePercent = Math.max(0, Math.min(50, number(wallet, "exchangeFeePercent", 5)));
         minWithdraw = Math.max(0, number(wallet, "minWithdraw", 10));
+
+        JsonObject buyback = object(root, "buyback");
+        buybackEnabled = flag(buyback, "enabled", true);
+        buybackDailyCap = Math.max(0, number(buyback, "dailyCap", 100_000));
+        buybackPlayerCap = Math.max(0, number(buyback, "playerCap", 20_000));
     }
 
     private static JsonObject write() {
@@ -192,6 +203,12 @@ public final class DepositConfig {
         wallet.addProperty("exchangeFeePercent", exchangeFeePercent);
         wallet.addProperty("minWithdraw", minWithdraw);
         root.add("wallet", wallet);
+
+        JsonObject buyback = new JsonObject();
+        buyback.addProperty("enabled", buybackEnabled);
+        buyback.addProperty("dailyCap", buybackDailyCap);
+        buyback.addProperty("playerCap", buybackPlayerCap);
+        root.add("buyback", buyback);
         return root;
     }
 
@@ -270,6 +287,23 @@ public final class DepositConfig {
         return minWithdraw;
     }
 
+    public static synchronized boolean buybackEnabled() {
+        ensureLoaded();
+        return buybackEnabled;
+    }
+
+    /** World-wide daily payout ceiling; 0 means uncapped. */
+    public static synchronized int buybackDailyCap() {
+        ensureLoaded();
+        return buybackDailyCap;
+    }
+
+    /** Per-player daily payout ceiling; 0 means uncapped. */
+    public static synchronized int buybackPlayerCap() {
+        ensureLoaded();
+        return buybackPlayerCap;
+    }
+
     // ------------------------------------------------------------------ script overrides
 
     public static synchronized void setItemPrice(String id, int spur) {
@@ -298,6 +332,20 @@ public final class DepositConfig {
                 return;
             }
         }
+        dirty = true;
+    }
+
+    /** Script hook: both caps in one call; 0 disables a cap. */
+    public static synchronized void setBuyback(int dailyCap, int playerCap) {
+        ensureLoaded();
+        buybackDailyCap = Math.max(0, dailyCap);
+        buybackPlayerCap = Math.max(0, playerCap);
+        dirty = true;
+    }
+
+    public static synchronized void setBuybackEnabled(boolean enabled) {
+        ensureLoaded();
+        buybackEnabled = enabled;
         dirty = true;
     }
 
