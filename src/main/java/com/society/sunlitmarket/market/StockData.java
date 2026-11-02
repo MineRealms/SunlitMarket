@@ -48,6 +48,18 @@ public final class StockData extends SavedData {
         return true;
     }
 
+    /** Goods sold back to the merchant restock his shelf, capped at capacity x initial. */
+    public void add(String key, int initial, int amount, double capacity) {
+        if (initial < 0 || amount <= 0) return;
+        long cap = Math.min((long) Integer.MAX_VALUE, (long) Math.ceil(initial * capacity));
+        int base = current.containsKey(key) ? current.get(key) : initial;
+        int updated = (int) Math.min(cap, (long) base + amount);
+        if (updated != base) {
+            current.put(key, updated);
+            setDirty();
+        }
+    }
+
     @Override
     public CompoundTag save(CompoundTag tag) {
         tag.putLong("day", day);

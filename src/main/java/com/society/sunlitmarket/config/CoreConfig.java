@@ -8,7 +8,8 @@ import net.minecraftforge.fml.config.ModConfig;
 public final class CoreConfig {
     public enum WantedScope { PERSONAL, TEAM }
     public static final ForgeConfigSpec SPEC;
-    public static final ForgeConfigSpec.BooleanValue TEAM_ALIGNMENT, PREVENT_ARBITRAGE;
+    public static final ForgeConfigSpec.BooleanValue TEAM_ALIGNMENT, PREVENT_ARBITRAGE, DYNAMIC_PRICING;
+    public static final ForgeConfigSpec.DoubleValue INVENTORY_ELASTICITY, PRICE_MIN_MULT, PRICE_MAX_MULT, SELL_OVERSTOCK;
     public static final ForgeConfigSpec.EnumValue<WantedScope> WANTED_SCOPE;
     public static final ForgeConfigSpec.BooleanValue COUNTER_ENABLED, CONFISCATION, WANTED_PRICES, ENFORCEMENT;
     public static final ForgeConfigSpec.IntValue REFUSE_BELOW, COUNTER_RANGE, REQUEST_INTERVAL, REQUEST_LIFETIME;
@@ -27,6 +28,13 @@ public final class CoreConfig {
         b.pop().push("trade");
         REFUSE_BELOW = b.defineInRange("refuseBelow", -100, -100000, 100000);
         PREVENT_ARBITRAGE = b.define("preventSameQuoteArbitrage", true);
+        DYNAMIC_PRICING = b.comment("Stocked shelves price by inventory: buying drains the shelf and raises prices, selling refills it and lowers them. Unlimited offers keep fixed prices.")
+                .define("dynamicPricing", true);
+        INVENTORY_ELASTICITY = b.defineInRange("inventoryElasticity", 0.2D, 0D, 2D);
+        PRICE_MIN_MULT = b.defineInRange("priceMultiplierMin", 0.5D, 0.05D, 4D);
+        PRICE_MAX_MULT = b.defineInRange("priceMultiplierMax", 2.0D, 0.1D, 8D);
+        SELL_OVERSTOCK = b.comment("Merchant shelf may be filled to this multiple of the restock level before further sales stop lowering prices.")
+                .defineInRange("sellOverstockCapacity", 3D, 1D, 16D);
         b.pop().push("counter");
         COUNTER_ENABLED = b.define("enabled", true);
         COUNTER_RANGE = b.defineInRange("range", 8, 1, 32);

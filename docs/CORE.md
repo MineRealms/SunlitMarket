@@ -8,6 +8,7 @@ This project owns the trading engine and optional ME/FTB adapters. It does not i
 
 - `config/sunlitmarket-common.toml`: existing alignment ranges, diplomatic backlash, decay and price ladder.
 - `config/sunlitmarket-core.toml`: team sharing, refusal threshold, same-quote price protection, counter limits and crime policy.
+- `trade.dynamicPricing` (default on) makes stocked shelves price by inventory: one scarcity factor `clamp((initial/max(stock,1))^elasticity, min, max)` scales BOTH directions of the same offer. Buying drains the shelf and raises prices; selling refills it (capped at `sellOverstockCapacity` x restock level) and lowers them. Unlimited offers (`stock: -1`) and fixed/coin offers keep fixed prices. Shelf stock still resets at the daily roll, which acts as the mean-reversion step.
 - `config/sunlitmarket/merchants.json`: legacy merchant array or `{ "merchants": [...] }`.
 - `config/sunlitmarket/rules.json`: NPC identities, explicit request pools and contraband laws. See `examples/core-rules.json`.
 - NPC identity rules accept `tag`, `npcType`, `entity` (registry id) and `profession` (villager profession). `entity` + `profession` is intended for pack NPCs such as vanilla villagers; `profession` alone matches any villager with that profession.

@@ -248,6 +248,14 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - `svCustomers.js` / `svMeCustomers.js` / `svMastery.js` / `meMerchants.js`：`node --check` 全通过。
 - Node 静态执行（完整价格数组）：646 条规则 / 631 个货池 / 15 条 NPC 规则；0 重复、0 个 `askPrice >= marketValue`；bread 22/14。
 - FTBQ 重点商品覆盖：crops 89/89、fishing 75/75、pantry 12/12、minerals 44/44；AS/TC/BOT 材料 19 条；GT/机器/收藏品未作为顾客商品。
+
+---
+
+## 10. E1 动态货架定价（2026-11-02，单测级）
+
+`trade.dynamicPricing`（默认开）：有库存的货架按稀缺度定价，`PriceEngine.scarcity = clamp((initial/max(stock,1))^e, min, max)` 同时作用于买/卖两个方向；玩家卖给商人会把货架补回（上限 `sellOverstockCapacity × initial`）， unlimited（stock:-1）与 fixed/coin 报价不变。日滚 StockData 全量重置即均值回归步。计划中的每笔冲击成本（k·sqrt）未实现——货架本身的库存变动已提供跨交易动态。
+
+`gradle test`：31 个单测全过（新增 PriceEngineTest 8 + StockDataTest 1）。未做游戏内验证；上服后观察点：买空一个货架后 ask 上浮、当日倾销后 bid 下浮、次日复位。
 - `gradle --no-daemon test build` 通过，生成 jar 并同步主客户端 / -DEV / mirror（sha256 前缀 `346db8b5`）。
 
 待服务器验收：实际实体职业名、物品 ID、货池生成、柜台 UI、ME 商人收购条目、mastery 阶段同步。

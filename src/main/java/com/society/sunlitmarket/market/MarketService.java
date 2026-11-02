@@ -25,15 +25,22 @@ public final class MarketService {
         return offer.id.isBlank() || offer.legacyIndex < 0 ? null : merchant.id + '#' + offer.legacyIndex;
     }
     public record Quote(int buy, int sell) {}
-    public static Quote quote(ServerPlayer p, Merchant m, Offer offer) {
+    public static Quote quote(ServerPlayer p, Merchant m, Offer offer) { return quote(p, m, offer, -1); }
+    public static Quote quote(ServerPlayer p, Merchant m, Offer offer, int index) {
         int alignment = AlignmentData.get(p.server).get(p, m.faction);
         var tier = SunlitMarketConfig.tierFor(alignment);
         double scale = PriceModifiers.get(m.id, offer.item);
         boolean fixed = offer.fixedPrice || Currency.coinValue(offer.item) > 0;
         double penalty = !fixed && CoreConfig.WANTED_PRICES.get()
                 ? 1D + AlignmentData.get(p.server).wanted(p) * CoreConfig.WANTED_SURCHARGE.get() : 1D;
-        int buy = TradeMath.price(PriceModifiers.apply(offer.buy, fixed ? 1D : scale), fixed ? 1D : tier.buy * penalty);
-        int sell = TradeMath.price(PriceModifiers.apply(offer.sell, fixed ? 1D : scale), fixed ? 1D : tier.sell / penalty);
+        double scarcity = 1.0D;
+        if (!fixed && index >= 0 && offer.stock >= 0 && CoreConfig.DYNAMIC_PRICING.get()) {
+            int shelf = StockData.get(p.server).get(stockKey(m, index), legacyStockKey(m, index), offer.stock);
+            scarcity = PriceEngine.scarcity(shelf, offer.stock, CoreConfig.INVENTORY_ELASTICITY.get(),
+                    CoreConfig.PRICE_MIN_MULT.get(), CoreConfig.PRICE_MAX_MULT.get());
+        }
+        int buy = TradeMath.price(PriceModifiers.apply(offer.buy, fixed ? 1D : scale), fixed ? 1D : tier.buy * penalty * scarcity);
+        int sell = TradeMath.price(PriceModifiers.apply(offer.sell, fixed ? 1D : scale), fixed ? 1D : tier.sell * scarcity / penalty);
         if (CoreConfig.PREVENT_ARBITRAGE.get() && !offer.allowArbitrage && buy > 0) sell = Math.min(sell, buy);
         return new Quote(buy, sell);
     }
@@ -50,7 +57,7 @@ public final class MarketService {
             Offer offer = m.offers.get(i); MarketView.Line line = new MarketView.Line();
             line.item = offer.item; line.count = offer.count; line.offerId = offer.id.isBlank() ? "legacy:" + i : offer.id;
             Quote q;
-            try { q = quote(p, m, offer); } catch (IllegalArgumentException ex) { q = new Quote(0, 0); }
+            try { q = quote(p, m, offer, i); } catch (IllegalArgumentException ex) { q = new Quote(0, 0); }
             line.buy = q.buy; line.sell = q.sell; line.reputation = offer.reputation;
             line.hasReputation = offer.hasReputation;
             line.stock = stock.get(stockKey(m, i), legacyStockKey(m, i), offer.stock); line.limit = offer.limit;
@@ -76,7 +83,7 @@ public final class MarketService {
         Offer offer = m.offers.get(index);
         String id = offer.id.isBlank() ? "legacy:" + index : offer.id;
         Quote q;
-        try { q = quote(p, m, offer); } catch (IllegalArgumentException ex) { update(p,m,"报价超出范围"); return; }
+        try { q = quote(p, m, offer, index); } catch (IllegalArgumentException ex) { update(p,m,"报价超出范围"); return; }
         if (!id.equals(offerId) || q.buy != expectedBuy || q.sell != expectedSell) { update(p, m, "报价已变化，请重新确认"); return; }
         handleAction(p, merchant, index, action, quantity);
     }
@@ -98,7 +105,7 @@ public final class MarketService {
         if (!UnlockData.get(p.server).has(p, offer.unlock)) return "尚未解锁：" + offer.unlock;
         if (alignment < CoreConfig.REFUSE_BELOW.get()) return "该派系拒绝交易";
         if (offer.hasReputation && alignment < offer.reputation) return "结盟值不足：需要 " + offer.reputation;
-        Quote q = quote(p, m, offer); int unit = action == ACTION_BUY ? q.buy : q.sell;
+        Quote q = quote(p, m, offer, index); int unit = action == ACTION_BUY ? q.buy : q.sell;
         if (unit <= 0) return "该交易方向未开放";
         int total = TradeMath.amount((long) unit * qty), count = TradeMath.amount((long) offer.count * qty);
         int reward = TradeMath.amount((long) offer.repGain * qty);
@@ -117,6 +124,7 @@ public final class MarketService {
                 action == ACTION_BUY ? -total : total);
         if (!result.isEmpty()) return result;
         if (action == ACTION_BUY) { stock.take(key, offer.stock, qty); limits.add(p, key, qty); }
+        if (action == ACTION_SELL && offer.stock >= 0) { stock.add(key, offer.stock, qty, CoreConfig.SELL_OVERSTOCK.get()); }
         if (reward > 0) AlignmentData.get(p.server).add(p, m.faction, reward);
         int tier=com.society.sunlitmarket.core.MarketRules.contraband(Currency.item(offer.item),m.faction,p.level().dimension().location().toString());
         if(tier>0)AlignmentData.get(p.server).addWanted(p,tier*CoreConfig.CONTRABAND_WANTED.get());
