@@ -94,6 +94,12 @@ public final class SunlitMarketMod {
         CHANNEL.messageBuilder(com.society.sunlitmarket.net.AlignmentMessage.class, 5, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(com.society.sunlitmarket.net.AlignmentMessage::encode).decoder(com.society.sunlitmarket.net.AlignmentMessage::decode)
                 .consumerMainThread(com.society.sunlitmarket.net.AlignmentMessage::handle).add();
+        CHANNEL.messageBuilder(com.society.sunlitmarket.net.ChartRequestMessage.class, 6, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(com.society.sunlitmarket.net.ChartRequestMessage::encode).decoder(com.society.sunlitmarket.net.ChartRequestMessage::decode)
+                .consumerMainThread(com.society.sunlitmarket.net.ChartRequestMessage::handle).add();
+        CHANNEL.messageBuilder(com.society.sunlitmarket.net.ChartDataMessage.class, 7, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(com.society.sunlitmarket.net.ChartDataMessage::encode).decoder(com.society.sunlitmarket.net.ChartDataMessage::decode)
+                .consumerMainThread(com.society.sunlitmarket.net.ChartDataMessage::handle).add();
         LOG.info("[SunlitMarket] ready (numismatics={})", ModList.get().isLoaded("numismatics"));
     }
 
@@ -231,6 +237,16 @@ public final class SunlitMarketMod {
         return 1;
     }
 
+    /** Sends one chart payload to the caller; the client opens (or refreshes) the panel. */
+    private static int openChart(net.minecraft.commands.CommandSourceStack source, String id, int period)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+        String json = com.society.sunlitmarket.market.ChartService.json(player.server, id, period);
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                new com.society.sunlitmarket.net.ChartDataMessage(json));
+        return 1;
+    }
+
     private void onCommands(RegisterCommandsEvent event) {
         event.getDispatcher().register(Commands.literal("sunlitmarket")
                 .requires(source -> source.hasPermission(2))
@@ -281,6 +297,13 @@ public final class SunlitMarketMod {
                     }
                     return ids.size();
                 }))
+                .then(Commands.literal("chart")
+                        .executes(ctx -> openChart(ctx.getSource(), "", MarketData.PERIODS[0]))
+                        .then(Commands.argument("id", StringArgumentType.string())
+                                .executes(ctx -> openChart(ctx.getSource(), StringArgumentType.getString(ctx, "id"), MarketData.PERIODS[0]))
+                                .then(Commands.argument("period", IntegerArgumentType.integer(1))
+                                        .executes(ctx -> openChart(ctx.getSource(), StringArgumentType.getString(ctx, "id"),
+                                                IntegerArgumentType.getInteger(ctx, "period"))))))
                 .then(Commands.literal("factions").executes(ctx -> {
                     java.util.List<String> ids = new java.util.ArrayList<>(FactionRelations.factions());
                     java.util.Collections.sort(ids);

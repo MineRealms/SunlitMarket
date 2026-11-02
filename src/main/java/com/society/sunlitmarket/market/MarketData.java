@@ -83,6 +83,12 @@ public final class MarketData extends SavedData {
         return candle == null ? -1 : candle[3];
     }
 
+    /** Bucket index of the candle currently being built, or 0 when unknown. */
+    public synchronized long lastBucket(String id, int period) {
+        IndexState state = indices.get(id);
+        return state == null ? 0L : state.bucket.getOrDefault(period, 0L);
+    }
+
     public synchronized String name(String id) {
         IndexState state = indices.get(id);
         return state == null ? id : state.name;
