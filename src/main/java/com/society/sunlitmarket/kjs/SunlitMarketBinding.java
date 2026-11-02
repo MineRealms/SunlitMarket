@@ -54,13 +54,8 @@ public final class SunlitMarketBinding {
      * Members bind to a merchant offer; the index measures modifier x shelf-scarcity against
      * the static script base. Candles persist across reloads; membership is replaced.
      */
-    public void index(String id, Object name, Object members) {
+    public boolean index(String id, Object name, Object members) {
         try {
-            net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
-            if (server == null) {
-                SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.index needs a running server");
-                return;
-            }
             java.util.List<MarketData.Member> list = new java.util.ArrayList<>();
             if (members instanceof Iterable<?> rows) {
                 for (Object row : rows) {
@@ -76,14 +71,27 @@ public final class SunlitMarketBinding {
                     }
                 }
             }
-            if (list.isEmpty()) {
+            if (id == null || id.isBlank() || list.isEmpty()) {
                 SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.index({}) has no members", id);
-                return;
+                return false;
             }
-            MarketData.get(server).defineIndex(id, name == null ? id : String.valueOf(name), list);
+            com.society.sunlitmarket.market.PendingIndices.put(id, name == null ? id : String.valueOf(name), list);
+            net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+            if (server == null) {
+                SunlitMarketMod.LOG.info("[SunlitMarket] index {} buffered until a world is loaded", id);
+                return true;
+            }
+            com.society.sunlitmarket.market.PendingIndices.applyTo(server);
+            return true;
         } catch (Throwable t) {
             SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.index failed", t);
         }
+        return false;
+    }
+
+    /** Drops every buffered index definition; call at the top of a script that defines indices. */
+    public void clearIndices() {
+        com.society.sunlitmarket.market.PendingIndices.clear();
     }
 
     // ---- alignment ------------------------------------------------------------------

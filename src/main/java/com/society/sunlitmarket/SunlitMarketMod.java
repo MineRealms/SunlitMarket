@@ -105,6 +105,10 @@ public final class SunlitMarketMod {
 
     private void onServerStarted(ServerStartedEvent event) {
         MarketRegistry.loadJson();
+        int indices = com.society.sunlitmarket.market.PendingIndices.applyTo(event.getServer());
+        if (indices > 0) {
+            LOG.info("[SunlitMarket] applied {} buffered price indices", indices);
+        }
         com.society.sunlitmarket.core.MarketRules.loadJson();
         FactionRelations.reload(event.getServer());
         lastAlignmentDay = Long.MIN_VALUE;
