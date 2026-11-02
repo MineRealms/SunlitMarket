@@ -1,26 +1,38 @@
 package com.society.sunlitmarket.audit;
 
 import com.google.gson.JsonObject;
+import java.time.Instant;
 import java.util.UUID;
 
-/** Immutable best-effort observation; it never participates in settlement decisions. */
+/** One observation, not a recoverable transaction or a total-money measurement. */
 public record ObservedMoneyEvent(
-        UUID eventId, String epoch, long sequence, long gameTime, long dayTime,
-        String source, String reason, String backend, String outcome,
-        long requestedDelta, Long confirmedDelta, UUID player,
-        String valuationVersion, String note) {
+        UUID eventId, UUID operationId, String epoch, long sequence, Instant timestamp,
+        long gameTime, long dayTime, String source, String backend, String outcome,
+        long requestedDelta, Long confirmedDelta, UUID player, String valuationVersion,
+        Long grossCoinCreated, Long grossCoinRemoved, String note) {
+    public String utcDay() { return timestamp.toString().substring(0, 10); }
+
     public JsonObject json() {
         JsonObject o = new JsonObject();
+        o.addProperty("schema", 2);
         o.addProperty("eventId", eventId.toString());
-        o.addProperty("epoch", epoch); o.addProperty("sequence", sequence);
-        o.addProperty("gameTime", gameTime); o.addProperty("dayTime", dayTime);
-        o.addProperty("source", source); o.addProperty("reason", reason);
-        o.addProperty("backend", backend); o.addProperty("outcome", outcome);
+        o.addProperty("operationId", operationId == null ? null : operationId.toString());
+        o.addProperty("epoch", epoch);
+        o.addProperty("sequence", sequence);
+        o.addProperty("timestamp", timestamp.toString());
+        o.addProperty("utcDay", utcDay());
+        o.addProperty("gameTime", gameTime);
+        o.addProperty("dayTime", dayTime);
+        o.addProperty("source", source);
+        o.addProperty("backend", backend);
+        o.addProperty("outcome", outcome);
         o.addProperty("requestedDelta", requestedDelta);
-        if (confirmedDelta == null) o.add("confirmedDelta", null); else o.addProperty("confirmedDelta", confirmedDelta);
-        if (player == null) o.add("player", null); else o.addProperty("player", player.toString());
-        if (valuationVersion == null) o.add("valuationVersion", null); else o.addProperty("valuationVersion", valuationVersion);
-        if (note == null) o.add("note", null); else o.addProperty("note", note);
+        o.addProperty("confirmedDelta", confirmedDelta);
+        o.addProperty("player", player == null ? null : player.toString());
+        o.addProperty("valuationVersion", valuationVersion);
+        o.addProperty("grossCoinCreated", grossCoinCreated);
+        o.addProperty("grossCoinRemoved", grossCoinRemoved);
+        o.addProperty("note", note);
         return o;
     }
 }

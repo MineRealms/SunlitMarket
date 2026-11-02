@@ -102,7 +102,7 @@ public final class CounterBlockEntity extends BlockEntity implements net.minecra
         if(hook.cancelled)return "收购被脚本取消";
         if(hook.price<1||hook.price>10000000)return "脚本报价无效";
         if(hook.price!=r.ask){r.ask=hook.price;setChanged();return "报价已更新，请重新确认";}
-        String result=Currency.settle(p,null,this,goods,goods.getCount(),-r.ask);
+        String result=Currency.settle(p,null,this,goods,goods.getCount(),-r.ask,"COUNTER_PURCHASE");
         if(!result.isEmpty())return result;
         requests.remove(r);setChanged();
         if(r.heat>0) {AlignmentData.get(p.server).addWanted(p,Math.max(0,r.wanted));AlignmentData.get(p.server).add(p,r.faction,-CoreConfig.STOLEN_ALIGNMENT_LOSS.get());}

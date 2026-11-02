@@ -150,8 +150,9 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
             }
         }
         if (com.society.sunlitmarket.wallet.Wallet.enabled()) {
+            Long auditBefore = com.society.sunlitmarket.audit.EconomyAudit.walletBefore(player);
             com.society.sunlitmarket.wallet.Wallet.add(player, total);
-            try { com.society.sunlitmarket.audit.EconomyAudit.observeSettlement(player.server, "DEPOSIT_BIN_PAYOUT", "WALLET", "CONFIRMED", total, player.getUUID(), "direct wallet payout; valuation estimate"); } catch (Throwable ignored) {}
+            com.society.sunlitmarket.audit.EconomyAudit.walletAfter(player, auditBefore, total, true, "DEPOSIT_BIN_PAYOUT");
             drain();
             if (ledger != null) ledger.record(player, today, total);
             lastPayout = total;
@@ -159,7 +160,7 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
             setChanged();
             return lastMessage;
         }
-        String error = Currency.settle(player, null, null, ItemStack.EMPTY, 0, total);
+        String error = Currency.settle(player, null, null, ItemStack.EMPTY, 0, total, "DEPOSIT_BIN_PAYOUT");
         if (error != null && !error.isEmpty()) return error;
         drain();
         if (ledger != null) ledger.record(player, today, total);

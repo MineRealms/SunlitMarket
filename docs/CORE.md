@@ -127,5 +127,7 @@ After events are notifications, not rollback hooks. Recursive settlement from wi
 - `/sunlitmarket selftest`: explicitly invoked in an isolated single-player world (dedicated servers need `-Dsunlitmarket.allowSelfTest=true`). It temporarily uses inventory and an empty position two blocks overhead, restores them, and reports assertions. Do not use it in production.
 - `/sunlitmarket identity <entity>` shows resolved NPC identity.
 - `/sunlitalignment` opens the scrollable alignment view.
+- S0 observations: `/sunlitmarket audit status|gaps|day [YYYY-MM-DD]`. Scope and limitations are in `S0_OBSERVATIONS.md`; `observedNet` is not world money supply.
+- Isolated real-settlement probe: `-PcoreMinimal -PauditSmoke runServer`, then `/sunlitmarket audit smoketest`. It refuses connected players or an installed bank.
 
 See `TESTING.md` for observed results and remaining verification gaps, rather than treating a successful build as gameplay acceptance.

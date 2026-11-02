@@ -38,11 +38,25 @@ public final class CoreCommands {
                 var p=c.getSource().getPlayerOrException();var hit=p.pick(6,0,false);
                 if(hit instanceof net.minecraft.world.phys.BlockHitResult b&&p.level().getBlockEntity(b.getBlockPos()) instanceof CounterBlockEntity be){be.transfer(p);c.getSource().sendSuccess(()->Component.literal("Counter ownership recovered"),true);return 1;}return 0;
             }))
-            .then(Commands.literal("audit").then(Commands.literal("status").executes(c->{
-                var s=c.getSource().getServer();c.getSource().sendSuccess(()->Component.literal(com.society.sunlitmarket.audit.EconomyAudit.status(s)),false);return 1;
-            })).then(Commands.literal("gaps").executes(c->{
-                c.getSource().sendSuccess(()->Component.literal("scope=SUNLITMARKET_SETTLEMENTS_ONLY; external bank/coin creators, direct item exchange, C/R/NPC budgets and unhooked wallet mutations are UNKNOWN or outside coverage"),false);return 1;
-            })))
+            .then(Commands.literal("audit")
+                .then(Commands.literal("smoketest").requires(s->Boolean.getBoolean("sunlitmarket.audit.allowSmoke")).executes(c->{
+                    String result=com.society.sunlitmarket.audit.AuditSmokeTest.run(c.getSource().getServer());
+                    c.getSource().sendSuccess(()->Component.literal(result),false);return result.startsWith("PASS")?1:0;
+                }))
+                .then(Commands.literal("status").executes(c->{
+                    c.getSource().sendSuccess(()->Component.literal(com.society.sunlitmarket.audit.EconomyAudit.status(c.getSource().getServer())),false);return 1;
+                }))
+                .then(Commands.literal("gaps").executes(c->{
+                    c.getSource().sendSuccess(()->Component.literal(com.society.sunlitmarket.audit.EconomyAudit.gaps(c.getSource().getServer())),false);return 1;
+                }))
+                .then(Commands.literal("day").executes(c->{
+                    c.getSource().sendSuccess(()->Component.literal(com.society.sunlitmarket.audit.EconomyAudit.day(c.getSource().getServer())),false);return 1;
+                }).then(Commands.argument("date",com.mojang.brigadier.arguments.StringArgumentType.word()).executes(c->{
+                    try {
+                        String result=com.society.sunlitmarket.audit.EconomyAudit.day(c.getSource().getServer(),com.mojang.brigadier.arguments.StringArgumentType.getString(c,"date"));
+                        c.getSource().sendSuccess(()->Component.literal(result),false);return 1;
+                    } catch(java.time.DateTimeException ex){c.getSource().sendFailure(Component.literal("Expected UTC date YYYY-MM-DD"));return 0;}
+                }))))
             .then(Commands.literal("selftest").executes(c->{
                 ServerPlayer p=c.getSource().getPlayerOrException();
                 if(!p.server.isSingleplayer()&&!Boolean.getBoolean("sunlitmarket.allowSelfTest")){c.getSource().sendFailure(Component.literal("Self-test is restricted to isolated development worlds"));return 0;}

@@ -2,6 +2,8 @@ package com.society.sunlitmarket.currency;
 
 import com.society.sunlitmarket.SunlitMarketMod;
 import com.society.sunlitmarket.core.TradeMath;
+import com.society.sunlitmarket.audit.EconomyAudit;
+import com.society.sunlitmarket.audit.SettlementObservation;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.Container;
@@ -34,13 +36,16 @@ public final class Currency {
     public static synchronized void endScripts(boolean valid) {
         if (staging != null && valid) { VALUES.clear(); VALUES.putAll(staging); }
         staging = null;
+        EconomyAudit.mappingChanged();
     }
     public static synchronized void resetValues() {
         Map<String,Integer> values=target(); values.clear(); defaults(values);
+        if (staging == null) EconomyAudit.mappingChanged();
     }
     public static synchronized void setCoinValue(String id, int value) {
         if (ResourceLocation.tryParse(id) == null) throw new IllegalArgumentException("Invalid coin id");
         if (value <= 0) target().remove(id); else target().put(id, value);
+        if (staging == null) EconomyAudit.mappingChanged();
     }
     public static synchronized int coinValue(String id) { return VALUES.getOrDefault(id, 0); }
     public static synchronized List<Map.Entry<String,Integer>> denominations() {
@@ -111,7 +116,7 @@ public final class Currency {
         }
         return false;
     }
-    private static boolean coins(List<ItemStack> slots, int delta) {
+    private static boolean coins(List<ItemStack> slots, int delta, SettlementObservation observation) {
         if (delta < 0) {
             long paid = 0, needed = -(long) delta;
             for (ItemStack s : slots) {
@@ -119,13 +124,14 @@ public final class Currency {
                 if (value <= 0 || paid >= needed) continue;
                 int n = (int) Math.min(s.getCount(), (needed - paid + value - 1L) / value);
                 s.shrink(n); paid += (long) n * value;
+                observation.removed((long) n * value);
             }
             if (paid < needed) return false;
-            return mint(slots, paid - needed);
+            return mint(slots, paid - needed, observation);
         }
-        return mint(slots, delta);
+        return mint(slots, delta, observation);
     }
-    private static boolean mint(List<ItemStack> slots, long amount) {
+    private static boolean mint(List<ItemStack> slots, long amount, SettlementObservation observation) {
         for (var d : denominations()) {
             ResourceLocation id = ResourceLocation.tryParse(d.getKey());
             if (id == null || !BuiltInRegistries.ITEM.containsKey(id)) continue;
@@ -134,6 +140,7 @@ public final class Currency {
             long n = amount / d.getValue();
             if (n > Integer.MAX_VALUE || (n > 0 && !insert(slots, template, (int) n, 64))) return false;
             amount -= n * d.getValue();
+            observation.created(n * d.getValue());
         }
         return amount == 0;
     }
@@ -142,24 +149,38 @@ public final class Currency {
         return observedSettle(player, source, target, item, count, moneyDelta, true, "SETTLE");
     }
 
+    public static String settle(Player player, Container source, Container target, ItemStack item, int count, int moneyDelta, String auditReason) {
+        return observedSettle(player, source, target, item, count, moneyDelta, true, auditReason);
+    }
+
+    public static boolean pay(Player player, int amount, String auditReason) {
+        return amount >= 0 && observedSettle(player, null, null, ItemStack.EMPTY, 0, -amount, true, auditReason).isEmpty();
+    }
+
     private static String observedSettle(Player player, Container source, Container target, ItemStack item, int count, int moneyDelta, boolean useWallet, String reason) {
+        SettlementObservation observation = new SettlementObservation();
         String result;
         try {
-            result = settleInternal(player, source, target, item, count, moneyDelta, useWallet);
+            result = settleInternal(player, source, target, item, count, moneyDelta, useWallet, observation);
         } catch (RuntimeException ex) {
-            try { com.society.sunlitmarket.audit.EconomyAudit.observeSettlement(((net.minecraft.server.level.ServerPlayer) player).server, reason, "UNKNOWN", "EXCEPTION", moneyDelta, player.getUUID(), "runtime exception"); } catch (Throwable ignored) {}
+            observation.uncertain();
+            auditSettlement(player, item, count, moneyDelta, reason, observation);
             throw ex;
         }
-        try {
-            // Do not read the bank a second time merely for telemetry. A debit may have
-            // selected the wallet or the cash/bank backend; the observer records that ambiguity.
-            String backend = useWallet && moneyDelta < 0 && com.society.sunlitmarket.wallet.Wallet.enabled()
-                    ? "WALLET_OR_CASH" : "CASH_OR_BANK";
-            String outcome = result.isEmpty() ? "CONFIRMED" : (result.contains("不明") ? "UNKNOWN" : "FAILED");
-            com.society.sunlitmarket.audit.EconomyAudit.observeSettlement(((net.minecraft.server.level.ServerPlayer) player).server, reason, backend, outcome,
-                    moneyDelta, player.getUUID(), result.isEmpty() ? null : "settlement rejected");
-        } catch (Throwable ignored) {}
+        auditSettlement(player, item, count, moneyDelta, reason, observation);
         return result;
+    }
+
+    private static void auditSettlement(Player player, ItemStack item, int count, int moneyDelta, String fallback, SettlementObservation observation) {
+        try {
+            if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+                String goods = BuiltInRegistries.ITEM.getKey(item.getItem()) + " x" + count;
+                EconomyAudit.emit(sp.server, EconomyAudit.reason(fallback), observation.backend(), observation.outcome(),
+                        moneyDelta, observation.delta(), player.getUUID(), EconomyAudit.operation(),
+                        observation.grossCreated(), observation.grossRemoved(),
+                        "settlement payment leg; goods=" + goods + "; not a full business transaction or total supply");
+            }
+        } catch (Throwable ignored) {}
     }
 
     /**
@@ -168,7 +189,7 @@ public final class Currency {
      *                  top-up and the fee would be pure burn.
      */
     private static String settleInternal(Player player, Container source, Container target, ItemStack item,
-                                 int count, int moneyDelta, boolean useWallet) {
+                                 int count, int moneyDelta, boolean useWallet, SettlementObservation observation) {
         if (player.level().isClientSide) return "Server-only transaction";
         if (count < 0 || (count > 0 && item.isEmpty())) return "Invalid goods";
         Container wallet = player.getInventory();
@@ -192,8 +213,9 @@ public final class Currency {
         try {
             if (player.getPersistentData().getBoolean("sunlitmarket.bankUncertain")) return "银行需管理员核对后解锁";
             b = (moneyDelta == 0 || walletDebit) ? null : bank(player);
+            observation.backend(walletDebit ? "WALLET" : b != null ? "BANK" : moneyDelta == 0 ? "NONE" : "COINS");
             int next = b == null ? 0 : TradeMath.amount((long) b.balance + moneyDelta);
-            if (b == null && !walletDebit && !coins(walletMain, moneyDelta)) return "余额不足、无法精确找零或背包空间不足";
+            if (b == null && !walletDebit && !coins(walletMain, moneyDelta, observation)) return "余额不足、无法精确找零或背包空间不足";
             if (count > 0 && target != null && !insert(target == wallet ? walletMain : plans.get(target), item, count, target.getMaxStackSize()))
                 return "目标库存空间不足";
             if (walletDebit && !com.society.sunlitmarket.wallet.Wallet.take(player, -(long) moneyDelta))
@@ -206,8 +228,10 @@ public final class Currency {
             }
             plans.forEach(Currency::commit);
             player.getInventory().setChanged();
+            observation.success(moneyDelta);
             return "";
         } catch (ReflectiveOperationException | RuntimeException ex) {
+            observation.uncertain();
             originals.forEach(Currency::commit);
             if (walletDebit) com.society.sunlitmarket.wallet.Wallet.set(player, walletBefore);
             boolean restored = !bankAttempted;
@@ -217,6 +241,7 @@ public final class Currency {
             } catch (ReflectiveOperationException | RuntimeException restoreFailure) { ex.addSuppressed(restoreFailure); }
             if (!restored) player.getPersistentData().putBoolean("sunlitmarket.bankUncertain",true);
             SunlitMarketMod.LOG.error("[SunlitMarket] Settlement aborted; inventory restored, bankRestored={}", restored, ex);
+            if (restored) observation.restored();
             return restored ? "交易未完成，库存与余额已保留" : "银行结果不明，交易已锁定，请管理员核对";
         }
     }

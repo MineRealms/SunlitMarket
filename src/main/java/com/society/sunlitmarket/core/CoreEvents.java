@@ -32,6 +32,7 @@ public final class CoreEvents {
         MinecraftForge.EVENT_BUS.addListener(CoreEvents::logout);
         MinecraftForge.EVENT_BUS.addListener(CoreEvents::death);
         MinecraftForge.EVENT_BUS.addListener(CoreEvents::stopped);
+        MinecraftForge.EVENT_BUS.addListener(CoreEvents::stopping);
     }
     private static void config(ModConfigEvent e){
         if(e.getConfig().getSpec()!=SunlitMarketConfig.SPEC&&e.getConfig().getSpec()!=CoreConfig.SPEC)return;
@@ -46,7 +47,7 @@ public final class CoreEvents {
             }
         });
     }
-    private static void tick(TickEvent.ServerTickEvent e){if(e.phase==TickEvent.Phase.END)CrimeService.tick(e.getServer());}
+    private static void tick(TickEvent.ServerTickEvent e){if(e.phase==TickEvent.Phase.END){CrimeService.tick(e.getServer());com.society.sunlitmarket.audit.EconomyAudit.tick(e.getServer());}}
     private static void breakBlock(BlockEvent.BreakEvent e){
         if(e.getLevel().getBlockEntity(e.getPos()) instanceof CounterBlockEntity be&&!be.access(e.getPlayer())&&!e.getPlayer().hasPermissions(2))e.setCanceled(true);
     }
@@ -62,5 +63,6 @@ public final class CoreEvents {
         }
     }
     private static void logout(PlayerEvent.PlayerLoggedOutEvent e){if(e.getEntity() instanceof net.minecraft.server.level.ServerPlayer p)TradeSessions.close(p);}
-    private static void stopped(ServerStoppedEvent e){TradeSessions.clear();com.society.sunlitmarket.compat.MiddleEarthCompat.clear();com.society.sunlitmarket.audit.EconomyAudit.stop();}
+    private static void stopping(net.minecraftforge.event.server.ServerStoppingEvent e){com.society.sunlitmarket.audit.EconomyAudit.stop(e.getServer());}
+    private static void stopped(ServerStoppedEvent e){TradeSessions.clear();com.society.sunlitmarket.compat.MiddleEarthCompat.clear();com.society.sunlitmarket.audit.EconomyAudit.stop(e.getServer());}
 }

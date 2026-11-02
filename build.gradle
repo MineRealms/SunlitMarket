@@ -27,6 +27,7 @@ minecraft {
             }
         }
         server {
+            if (project.hasProperty('auditSmoke')) property 'sunlitmarket.audit.allowSmoke', 'true'
             workingDirectory project.file(project.hasProperty('coreMinimal') ? 'run-minimal' : 'run-server')
             args '--nogui'
         }

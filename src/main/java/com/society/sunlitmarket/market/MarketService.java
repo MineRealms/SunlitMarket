@@ -123,7 +123,7 @@ public final class MarketService {
         if (hook.price != total) return "货架价格变更请使用价格倍率接口并重新确认";
         String result = Currency.settle(p, action == ACTION_SELL ? p.getInventory() : null,
                 action == ACTION_BUY ? p.getInventory() : null, Currency.item(offer.item), count,
-                action == ACTION_BUY ? -total : total);
+                action == ACTION_BUY ? -total : total, action == ACTION_BUY ? "MARKET_BUY" : "MARKET_SELL");
         if (!result.isEmpty()) return result;
         if (action == ACTION_BUY) { stock.take(key, offer.stock, qty); limits.add(p, key, qty); }
         if (action == ACTION_SELL && offer.stock >= 0) { stock.add(key, offer.stock, qty, CoreConfig.SELL_OVERSTOCK.get()); }

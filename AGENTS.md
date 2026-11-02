@@ -17,7 +17,10 @@ Sunlit Market 是给 Sunlit Valley 整合包写的 NPC 交易/声望附属 mod�
   设计/行为见 `docs/CORE.md`。**22 个单测 + 22 项 -DEV 集成断言通过**（`TESTING.md` 第 8 节）；
   FTB 真实双人队伍、Numismatics 银行、柜台/商人 GUI 视觉仍未验证（GUI 由用户亲自打开，勿用 Rosetta 操作界面）。
 - **Sunlit Valley 深度联动**：价格锚、Sunlit 职业顾客、ME 派系顾客、阶段桥和 ME 商人收购见
-  `docs/SUNLIT_VALLEY_INTEGRATION.md`。脚本已同步到主客户端 / -DEV / mirror；**只做了静态检查和构建，未启动服务器**，等待服务器验收。
+  `docs/SUNLIT_VALLEY_INTEGRATION.md`。仓库 `examples/sunlit-valley/` 里的顾客/商人映射已按 ME 1.4.2 出货数据修正，
+  **但尚未同步到主客户端 / -DEV / mirror**，也未完成 ME NPC 实机验收。
+- **S0 经济观察层**：只记录本模已接入的资金步骤，不是全服 M0；说明和限制见 `docs/S0_OBSERVATIONS.md`。
+  隔离专服真实 Currency 自检 14/14 通过；七天连续观测和 Numismatics 实机仍未完成。
 
 ## 2. 当前构建 / 部署
 
