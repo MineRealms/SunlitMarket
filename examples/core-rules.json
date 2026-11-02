@@ -1,0 +1,40 @@
+[
+  {
+    "id": "example:customer",
+    "type": "npc",
+    "tag": "sunlitmarket.example.customer",
+    "faction": "example:village",
+    "rank": "CIVILIAN"
+  },
+  {
+    "id": "example:apples",
+    "type": "pool",
+    "faction": "example:village",
+    "item": "minecraft:apple",
+    "count": 2,
+    "baseValue": 5,
+    "marketValue": 6,
+    "askPrice": 7,
+    "repGain": 1
+  },
+  {
+    "id": "example:inspector",
+    "type": "npc",
+    "tag": "sunlitmarket.example.inspector",
+    "faction": "example:village",
+    "rank": "SOLDIER",
+    "enforcer": true,
+    "dimension": "minecraft:overworld",
+    "x": 0,
+    "z": 0,
+    "radius": 512
+  },
+  {
+    "id": "example:contraband",
+    "type": "law",
+    "faction": "example:village",
+    "dimension": "minecraft:overworld",
+    "tag": "example:contraband",
+    "tier": 1
+  }
+]

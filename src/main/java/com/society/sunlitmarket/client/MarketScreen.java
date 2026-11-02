@@ -16,6 +16,9 @@ import net.minecraft.world.item.ItemStack;
 public final class MarketScreen extends Screen {
     private MarketView view;
     private String error;
+    private int offset;
+    private boolean pending;
+    private int visibleRows() { return Math.max(1, Math.min(8, (height - 120) / 26)); }
 
     public MarketScreen(MarketView view, String error) {
         super(Component.literal(view == null || view.merchantName == null || view.merchantName.isBlank()
@@ -27,18 +30,20 @@ public final class MarketScreen extends Screen {
     public void update(MarketView view, String error) {
         this.view = view == null ? new MarketView() : view;
         this.error = error == null ? "" : error;
+        pending = false;
+        offset = Math.min(offset, Math.max(0, this.view.offers.size() - visibleRows()));
         this.clearWidgets();
         this.init();
     }
 
     @Override
     protected void init() {
-        int rows = Math.min(view.offers.size(), 8);
+        int rows = Math.min(view.offers.size() - offset, visibleRows());
         int left = 20;
         int top = 50;
         for (int i = 0; i < rows; i++) {
-            final int index = i;
-            MarketView.Line line = view.offers.get(i);
+            final int index = i + offset;
+            MarketView.Line line = view.offers.get(i + offset);
             int y = top + i * 26;
             if (line.buy > 0 && line.stock != 0 && !line.locked) {
                 addRenderableWidget(Button.builder(Component.literal("买 " + line.buy), b -> send(index, MarketServiceAction.BUY))
@@ -49,12 +54,17 @@ public final class MarketScreen extends Screen {
                         .bounds(width - 84, y, 60, 18).build());
             }
         }
+        if (offset > 0) addRenderableWidget(Button.builder(Component.literal("上一页"), b -> { offset = Math.max(0, offset - visibleRows()); clearWidgets(); init(); }).bounds(20, height - 30, 65, 20).build());
+        if (offset + visibleRows() < view.offers.size()) addRenderableWidget(Button.builder(Component.literal("下一页"), b -> { offset += visibleRows(); clearWidgets(); init(); }).bounds(width - 85, height - 30, 65, 20).build());
         addRenderableWidget(Button.builder(Component.literal("关闭"), b -> this.onClose())
                 .bounds(width / 2 - 30, height - 30, 60, 20).build());
     }
 
     private void send(int index, int action) {
-        SunlitMarketMod.CHANNEL.sendToServer(new MarketActionMessage(view.merchantId, index, action, 1));
+        if (pending || view.session.isEmpty()) return;
+        pending = true;
+        MarketView.Line line = view.offers.get(index);
+        SunlitMarketMod.CHANNEL.sendToServer(new MarketActionMessage(view.merchantId, index, action, 1, view.session, view.sequence, line.offerId, line.buy, line.sell));
     }
 
     @Override
@@ -65,9 +75,9 @@ public final class MarketScreen extends Screen {
         String info = "余额 " + view.balance + " spur   |   " + view.faction + " " + view.reputation
                 + (view.title == null || view.title.isEmpty() ? "" : " (" + view.title + ")");
         graphics.drawString(font, info, 20, 30, 0xCCCCCC, false);
-        int rows = Math.min(view.offers.size(), 8);
+        int rows = Math.min(view.offers.size() - offset, visibleRows());
         for (int i = 0; i < rows; i++) {
-            MarketView.Line line = view.offers.get(i);
+            MarketView.Line line = view.offers.get(i + offset);
             int y = 50 + i * 26;
             Item item = BuiltInRegistries.ITEM.get(new ResourceLocation(line.item));
             if (item != null && item != net.minecraft.world.item.Items.AIR) {
@@ -83,7 +93,7 @@ public final class MarketScreen extends Screen {
                 if (status.length() > 0) status.append("  ");
                 status.append("限购 ").append(line.used).append('/').append(line.limit);
             }
-            if (line.reputation > 0) {
+            if (line.hasReputation) {
                 if (status.length() > 0) status.append("  ");
                 status.append("需声望 ").append(line.reputation);
             }
@@ -100,6 +110,12 @@ public final class MarketScreen extends Screen {
         if (!error.isEmpty()) {
             graphics.drawString(font, error, 20, height - 50, 0xFF5555, false);
         }
+    }
+
+    @Override
+    public void onClose() {
+        SunlitMarketMod.CHANNEL.sendToServer(new MarketActionMessage(view.merchantId, 0, -1, 0, view.session, view.sequence, "", 0, 0));
+        super.onClose();
     }
 
     @Override

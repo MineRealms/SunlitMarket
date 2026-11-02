@@ -1,232 +1,157 @@
 package com.society.sunlitmarket.alignment;
 
 import com.society.sunlitmarket.SunlitMarketMod;
+import com.society.sunlitmarket.compat.FtbTeamsCompat;
+import com.society.sunlitmarket.compat.OwnerKey;
 import com.society.sunlitmarket.config.SunlitMarketConfig;
+import com.society.sunlitmarket.core.TradeMath;
 import com.society.sunlitmarket.reputation.ReputationData;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.saveddata.SavedData;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Player x faction alignment, plus a wanted level.
- *
- * <p>Storage is keyed by "owner" rather than player so the FTB Teams dimension can be
- * added later without a format change: {@link #ownerOf(Player)} is the single place that
- * decides whether a player reads and writes their own row or their team's.</p>
- */
+/** Versioned player/team alignment. Wanted ownership is independently configurable. */
 public final class AlignmentData extends SavedData {
     private static final String NAME = "sunlitmarket_alignment";
-
-    private final Map<UUID, Entry> values = new HashMap<>();
+    private final Map<String, Entry> values = new HashMap<>();
     private boolean migrated;
-
+    private long currentDay = Long.MIN_VALUE;
     public static final class Entry {
         public final Map<String, Integer> alignment = new HashMap<>();
         public int wanted;
         public long lastDecayDay = Long.MIN_VALUE;
     }
-
     public static AlignmentData get(MinecraftServer server) {
-        AlignmentData data = server.overworld().getDataStorage()
-                .computeIfAbsent(AlignmentData::load, AlignmentData::new, NAME);
+        AlignmentData data = server.overworld().getDataStorage().computeIfAbsent(AlignmentData::load, AlignmentData::new, NAME);
+        data.currentDay = server.overworld().getDayTime() / 24000L;
         data.ensureMigrated(server);
         return data;
     }
-
-    /** Single seam for the future FTB Teams dimension. */
-    public static UUID ownerOf(Player player) {
-        return player.getUUID();
+    public static UUID ownerOf(Player player) { return OwnerKey.parse(ownerKey(player)).id(); }
+    public static String ownerKey(Player player) {
+        return com.society.sunlitmarket.config.CoreConfig.TEAM_ALIGNMENT.get() ? FtbTeamsCompat.owner(player).key() : OwnerKey.player(player.getUUID()).key();
     }
-
-    private Entry entry(UUID owner) {
-        return values.computeIfAbsent(owner, k -> new Entry());
+    private Entry entry(String key) {
+        return values.computeIfAbsent(key, k -> { Entry e = new Entry(); e.lastDecayDay = currentDay; return e; });
     }
-
-    public int get(Player player, String faction) {
-        return getByOwner(ownerOf(player), faction);
-    }
-
-    public int getByOwner(UUID owner, String faction) {
+    public int get(Player player, String faction) { return getKey(ownerKey(player), faction); }
+    public int getByOwner(UUID owner, String faction) { return getKey(OwnerKey.player(owner).key(), faction); }
+    private int getKey(String owner, String faction) {
         if (!SunlitMarketConfig.ALIGNMENT_ENABLED.get()) return 0;
         Entry e = values.get(owner);
-        if (e == null) return 0;
-        return e.alignment.getOrDefault(normalize(faction), 0);
+        return e == null ? 0 : clamp(e.alignment.getOrDefault(faction, 0));
     }
-
     public void set(Player player, String faction, int value) {
-        setByOwner(ownerOf(player), faction, value);
+        if (!FtbTeamsCompat.resolve(player).available()) throw new IllegalStateException("Team ownership unavailable");
+        setKey(ownerKey(player), faction, value);
     }
-
-    public void setByOwner(UUID owner, String faction, int value) {
+    public void setByOwner(UUID owner, String faction, int value) { setKey(OwnerKey.player(owner).key(), faction, value); }
+    private void setKey(String owner, String faction, int value) {
         if (faction == null || faction.isBlank()) return;
-        Entry e = entry(owner);
-        e.alignment.put(normalize(faction), clamp(value));
-        setDirty();
+        entry(owner).alignment.put(faction, clamp(value)); setDirty();
     }
-
-    /**
-     * Applies a delta and, when enabled, the diplomatic backlash: gaining with A costs
-     * you with every faction A is hostile to.
-     */
     public void add(Player player, String faction, int delta) {
-        addMany(player, Map.of(normalize(faction), delta));
+        if (faction != null && !faction.isBlank()) addMany(player, Map.of(faction, delta));
     }
-
     public void addMany(Player player, Map<String, Integer> deltas) {
-        if (deltas.isEmpty()) return;
-        UUID owner = ownerOf(player);
-        Entry e = entry(owner);
-        Map<String, Integer> applied = new HashMap<>(deltas);
-        if (SunlitMarketConfig.DOUBLE_DROP_ENABLED.get()) {
-            double ratio = SunlitMarketConfig.DOUBLE_DROP_RATIO.get();
-            for (Map.Entry<String, Integer> d : deltas.entrySet()) {
-                int v = d.getValue();
-                if (v <= 0) continue;
-                for (String enemy : FactionRelations.hostilesOf(d.getKey())) {
-                    if (enemy.equals(d.getKey())) continue;
-                    applied.merge(enemy, -(int) Math.ceil(v * ratio), Integer::sum);
-                }
+        if (!FtbTeamsCompat.resolve(player).available()) throw new IllegalStateException("Team ownership unavailable");
+        Entry e = entry(ownerKey(player));
+        Map<String, Long> applied = new HashMap<>();
+        for (var d : deltas.entrySet()) {
+            if (d.getKey() == null || d.getKey().isBlank() || d.getValue() == null) continue;
+            applied.merge(d.getKey(), (long) d.getValue(), Long::sum);
+            if (d.getValue() > 0 && SunlitMarketConfig.DOUBLE_DROP_ENABLED.get()) {
+                long actualGain = Math.max(0L, (long) clamp((long) e.alignment.getOrDefault(d.getKey(), 0) + d.getValue())
+                        - e.alignment.getOrDefault(d.getKey(), 0));
+                long loss = (long) Math.ceil(actualGain * SunlitMarketConfig.DOUBLE_DROP_RATIO.get());
+                for (String enemy : FactionRelations.hostilesOf(d.getKey()))
+                    if (!enemy.equals(d.getKey())) applied.merge(enemy, -loss, Long::sum);
             }
         }
-        for (Map.Entry<String, Integer> d : applied.entrySet()) {
-            int now = e.alignment.getOrDefault(d.getKey(), 0);
-            e.alignment.put(d.getKey(), clamp(now + d.getValue()));
-        }
+        applied.forEach((f, delta) -> e.alignment.put(f, clamp((long) e.alignment.getOrDefault(f, 0) + delta)));
         setDirty();
     }
-
+    private String wantedOwner(Player player) {
+        return com.society.sunlitmarket.config.CoreConfig.WANTED_SCOPE.get() == com.society.sunlitmarket.config.CoreConfig.WantedScope.TEAM
+                ? FtbTeamsCompat.owner(player).key() : OwnerKey.player(player.getUUID()).key();
+    }
     public int wanted(Player player) {
-        Entry e = values.get(ownerOf(player));
-        return e == null ? 0 : e.wanted;
+        Entry e = values.get(wantedOwner(player));
+        return e == null ? 0 : TradeMath.clamp(e.wanted, 0, SunlitMarketConfig.WANTED_MAX.get());
     }
-
     public void addWanted(Player player, int delta) {
-        Entry e = entry(ownerOf(player));
-        e.wanted = Math.max(0, Math.min(SunlitMarketConfig.WANTED_MAX.get(), e.wanted + delta));
-        setDirty();
+        setWanted(player, TradeMath.clamp((long) wanted(player) + delta, 0, SunlitMarketConfig.WANTED_MAX.get()));
     }
-
     public void setWanted(Player player, int value) {
-        Entry e = entry(ownerOf(player));
-        e.wanted = Math.max(0, Math.min(SunlitMarketConfig.WANTED_MAX.get(), value));
-        setDirty();
+        entry(wantedOwner(player)).wanted = TradeMath.clamp(value, 0, SunlitMarketConfig.WANTED_MAX.get()); setDirty();
     }
-
-    /** Non-zero factions only, so the UI does not drown in 17 empty rows. */
     public Map<String, Integer> snapshot(Player player) {
-        Entry e = values.get(ownerOf(player));
-        Map<String, Integer> out = new HashMap<>();
-        if (e == null) return out;
-        for (Map.Entry<String, Integer> a : e.alignment.entrySet()) {
-            if (a.getValue() != 0) out.put(a.getKey(), a.getValue());
-        }
-        return out;
+        Map<String, Integer> result = new HashMap<>();
+        if (!SunlitMarketConfig.ALIGNMENT_ENABLED.get()) return result;
+        Entry e = values.get(ownerKey(player));
+        if (e != null) e.alignment.forEach((k, v) -> { if (v != 0) result.put(k, clamp(v)); });
+        return result;
     }
-
-    /** Once-per-day drift toward zero. Idempotent for a given day. */
     public void roll(long day, MinecraftServer server) {
-        if (!SunlitMarketConfig.DECAY_ENABLED.get()) return;
-        int decay = SunlitMarketConfig.DECAY_PER_DAY.get();
-        int wantedDecay = SunlitMarketConfig.WANTED_DECAY_PER_DAY.get();
+        currentDay = day;
         boolean changed = false;
         for (Entry e : values.values()) {
-            if (e.lastDecayDay == day) continue;
-            e.lastDecayDay = day;
-            changed = true;
-            if (decay > 0) {
-                for (Map.Entry<String, Integer> a : e.alignment.entrySet()) {
-                    int v = a.getValue();
-                    if (v > 0) a.setValue(Math.max(0, v - decay));
-                    else if (v < 0) a.setValue(Math.min(0, v + decay));
-                }
-            }
-            if (wantedDecay > 0 && e.wanted > 0) {
-                e.wanted = Math.max(0, e.wanted - wantedDecay);
+            if (e.lastDecayDay != Long.MIN_VALUE && day <= e.lastDecayDay) continue;
+            long elapsed = TradeMath.days(e.lastDecayDay, day);
+            e.lastDecayDay = day; changed = true;
+            if (SunlitMarketConfig.DECAY_ENABLED.get()) {
+                e.alignment.replaceAll((k, v) -> TradeMath.decay(v, elapsed, SunlitMarketConfig.DECAY_PER_DAY.get()));
+                e.wanted = TradeMath.decay(e.wanted, elapsed, SunlitMarketConfig.WANTED_DECAY_PER_DAY.get());
             }
         }
         if (changed) setDirty();
     }
-
-    private static String normalize(String faction) {
-        return faction == null ? "" : faction;
+    private static int clamp(long value) {
+        return TradeMath.clamp(value, SunlitMarketConfig.ALIGNMENT_MIN.get(), SunlitMarketConfig.ALIGNMENT_MAX.get());
     }
-
-    private static int clamp(int value) {
-        int min = SunlitMarketConfig.ALIGNMENT_MIN.get();
-        int max = SunlitMarketConfig.ALIGNMENT_MAX.get();
-        return Math.max(min, Math.min(max, value));
-    }
-
-    /** Copies the legacy reputation table once, so existing worlds keep their progress. */
     private void ensureMigrated(MinecraftServer server) {
         if (migrated) return;
-        migrated = true;
         try {
-            ReputationData legacy = ReputationData.get(server);
-            int copied = 0;
-            for (Map.Entry<UUID, Map<String, Integer>> row : legacy.snapshotAll().entrySet()) {
-                Entry e = entry(row.getKey());
-                for (Map.Entry<String, Integer> a : row.getValue().entrySet()) {
-                    if (a.getValue() == null || a.getValue() == 0) continue;
-                    e.alignment.put(a.getKey(), clamp(a.getValue()));
-                    copied++;
-                }
+            Map<String, Map<String, Integer>> candidate = new HashMap<>();
+            for (var row : ReputationData.get(server).snapshotAll().entrySet()) {
+                Map<String, Integer> copy = new HashMap<>();
+                row.getValue().forEach((f, v) -> { if (v != null && v != 0) copy.put(f, clamp(v)); });
+                candidate.put(OwnerKey.player(row.getKey()).key(), copy);
             }
-            if (copied > 0) {
-                setDirty();
-                SunlitMarketMod.LOG.info("[SunlitMarket] migrated {} alignment rows from reputation", copied);
-            }
-        } catch (Throwable t) {
-            SunlitMarketMod.LOG.warn("[SunlitMarket] alignment migration failed", t);
+            candidate.forEach((owner, row) -> row.forEach((f, v) -> entry(owner).alignment.putIfAbsent(f, v)));
+            migrated = true; setDirty();
+            SunlitMarketMod.LOG.info("[SunlitMarket] legacy migration completed ({} owners)", candidate.size());
+        } catch (RuntimeException ex) {
+            SunlitMarketMod.LOG.error("[SunlitMarket] legacy migration incomplete; source preserved", ex);
         }
     }
-
     public static AlignmentData load(CompoundTag tag) {
-        AlignmentData data = new AlignmentData();
-        data.migrated = tag.getBoolean("migrated");
+        AlignmentData data = new AlignmentData(); data.migrated = tag.getBoolean("migrated");
         CompoundTag owners = tag.getCompound("owners");
-        for (String key : owners.getAllKeys()) {
+        for (String rawKey : owners.getAllKeys()) {
             try {
-                UUID owner = UUID.fromString(key);
-                CompoundTag raw = owners.getCompound(key);
+                String key = OwnerKey.parse(rawKey).key();
+                CompoundTag raw = owners.getCompound(rawKey), align = raw.getCompound("alignment");
                 Entry e = new Entry();
-                CompoundTag align = raw.getCompound("alignment");
-                for (String faction : align.getAllKeys()) {
-                    e.alignment.put(faction, align.getInt(faction));
-                }
-                e.wanted = raw.getInt("wanted");
+                for (String faction : align.getAllKeys()) e.alignment.put(faction, align.getInt(faction));
+                e.wanted = Math.max(0, raw.getInt("wanted"));
                 e.lastDecayDay = raw.contains("lastDecayDay") ? raw.getLong("lastDecayDay") : Long.MIN_VALUE;
-                data.values.put(owner, e);
-            } catch (Throwable ignored) {
-            }
+                data.values.put(key, e);
+            } catch (IllegalArgumentException ex) { SunlitMarketMod.LOG.warn("[SunlitMarket] Invalid alignment owner {}", rawKey); }
         }
         return data;
     }
-
-    @Override
-    public CompoundTag save(CompoundTag tag) {
+    @Override public CompoundTag save(CompoundTag tag) {
         CompoundTag owners = new CompoundTag();
-        for (Map.Entry<UUID, Entry> owner : values.entrySet()) {
-            CompoundTag raw = new CompoundTag();
-            CompoundTag align = new CompoundTag();
-            for (Map.Entry<String, Integer> a : owner.getValue().alignment.entrySet()) {
-                align.putInt(a.getKey(), a.getValue());
-            }
-            raw.put("alignment", align);
-            raw.putInt("wanted", owner.getValue().wanted);
-            if (owner.getValue().lastDecayDay != Long.MIN_VALUE) {
-                raw.putLong("lastDecayDay", owner.getValue().lastDecayDay);
-            }
-            owners.put(owner.getKey().toString(), raw);
-        }
-        tag.put("owners", owners);
-        tag.putBoolean("migrated", true);
-        return tag;
+        values.forEach((key, e) -> {
+            CompoundTag raw = new CompoundTag(), align = new CompoundTag();
+            e.alignment.forEach(align::putInt); raw.put("alignment", align); raw.putInt("wanted", e.wanted);
+            raw.putLong("lastDecayDay", e.lastDecayDay); owners.put(key, raw);
+        });
+        tag.put("owners", owners); tag.putBoolean("migrated", migrated); tag.putInt("version", 2); return tag;
     }
-
 }

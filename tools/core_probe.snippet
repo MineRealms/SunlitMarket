@@ -1,0 +1,18 @@
+net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+net.minecraft.server.MinecraftServer server = mc.getSingleplayerServer();
+if (server == null) return "NOT_READY: no integrated server";
+server.execute(() -> {
+    try {
+        Object playerList = null;
+        for (java.lang.reflect.Method method : server.getClass().getMethods()) if (method.getParameterCount() == 0 && method.getReturnType() == net.minecraft.server.players.PlayerList.class) { playerList = method.invoke(server); break; }
+        net.minecraft.server.level.ServerPlayer player = null;
+        for (java.lang.reflect.Method method : playerList.getClass().getMethods()) if (method.getParameterCount() == 0 && java.util.List.class.isAssignableFrom(method.getReturnType())) {
+            java.util.List list = (java.util.List) method.invoke(playerList);
+            if (!list.isEmpty() && list.get(0) instanceof net.minecraft.server.level.ServerPlayer) { player = (net.minecraft.server.level.ServerPlayer) list.get(0); break; }
+        }
+        if (player == null) { com.society.sunlitmarket.SunlitMarketMod.LOG.info("[SM-CORE-PROBE] NOT_READY: no player"); return; }
+        String result = com.society.sunlitmarket.core.CoreSelfTest.run(player);
+        com.society.sunlitmarket.SunlitMarketMod.LOG.info("[SM-CORE-PROBE] {}", result);
+    } catch (Exception ex) { com.society.sunlitmarket.SunlitMarketMod.LOG.error("[SM-CORE-PROBE] bridge failed", ex); }
+});
+return "Core probe scheduled on server thread";

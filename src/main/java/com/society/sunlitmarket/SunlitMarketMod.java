@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
 public final class SunlitMarketMod {
     public static final String MOD_ID = "sunlitmarket";
     public static final Logger LOG = LoggerFactory.getLogger(MOD_ID);
-    private static final String PROTOCOL = "1";
+    private static final String PROTOCOL = "2";
     private long lastAlignmentDay = Long.MIN_VALUE;
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.ChannelBuilder
@@ -59,7 +59,10 @@ public final class SunlitMarketMod {
 
     public SunlitMarketMod() {
         SunlitMarketConfig.register();
+        com.society.sunlitmarket.config.CoreConfig.register();
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
+        com.society.sunlitmarket.counter.CounterRegistry.register(bus);
+        com.society.sunlitmarket.core.CoreEvents.register(bus);
         bus.addListener(this::onCommonSetup);
         MinecraftForge.EVENT_BUS.addListener(this::onServerTick);
         MinecraftForge.EVENT_BUS.addListener(this::onServerStarted);
@@ -67,7 +70,7 @@ public final class SunlitMarketMod {
         MinecraftForge.EVENT_BUS.addListener(this::onEntityInteract);
         MinecraftForge.EVENT_BUS.addListener(this::onEntityJoin);
         MinecraftForge.EVENT_BUS.addListener(this::onChangeTarget);
-        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> com.society.sunlitmarket.client.MarketClient.init());
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> { com.society.sunlitmarket.client.MarketClient.init(); com.society.sunlitmarket.client.CounterClient.init(); });
     }
 
     private void onCommonSetup(FMLCommonSetupEvent event) {
@@ -80,12 +83,24 @@ public final class SunlitMarketMod {
         CHANNEL.messageBuilder(MarketActionMessage.class, 2, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(MarketActionMessage::encode).decoder(MarketActionMessage::decode)
                 .consumerMainThread(MarketActionMessage::handle).add();
+        CHANNEL.messageBuilder(com.society.sunlitmarket.net.CounterStateMessage.class, 3, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(com.society.sunlitmarket.net.CounterStateMessage::encode).decoder(com.society.sunlitmarket.net.CounterStateMessage::decode)
+                .consumerMainThread(com.society.sunlitmarket.net.CounterStateMessage::handle).add();
+        CHANNEL.messageBuilder(com.society.sunlitmarket.net.CounterActionMessage.class, 4, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(com.society.sunlitmarket.net.CounterActionMessage::encode).decoder(com.society.sunlitmarket.net.CounterActionMessage::decode)
+                .consumerMainThread(com.society.sunlitmarket.net.CounterActionMessage::handle).add();
+        CHANNEL.messageBuilder(com.society.sunlitmarket.net.AlignmentMessage.class, 5, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(com.society.sunlitmarket.net.AlignmentMessage::encode).decoder(com.society.sunlitmarket.net.AlignmentMessage::decode)
+                .consumerMainThread(com.society.sunlitmarket.net.AlignmentMessage::handle).add();
         LOG.info("[SunlitMarket] ready (numismatics={})", ModList.get().isLoaded("numismatics"));
     }
 
     private void onServerStarted(ServerStartedEvent event) {
         MarketRegistry.loadJson();
+        com.society.sunlitmarket.core.MarketRules.loadJson();
         FactionRelations.reload(event.getServer());
+        lastAlignmentDay = Long.MIN_VALUE;
+        com.society.sunlitmarket.market.TradeSessions.clear();
     }
 
     /** Once per in-game day: drift alignment toward zero and cool down wanted level. */
@@ -105,13 +120,13 @@ public final class SunlitMarketMod {
         Merchant merchant = MarketRegistry.resolve(event.getTarget());
         if (merchant == null) return;
         event.setCanceled(true);
-        MarketService.open(player, merchant);
+        MarketService.open(player, merchant, event.getTarget());
     }
 
     private void onEntityJoin(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide()) return;
         if (event.getEntity() instanceof Mob mob
-                && event.getEntity().getTags().stream().anyMatch(tag -> tag.startsWith("sunlitmarket."))) {
+                && isMerchant(event.getEntity())) {
             mob.setPersistenceRequired();
         }
     }
@@ -125,7 +140,7 @@ public final class SunlitMarketMod {
     }
 
     private static boolean isMerchant(net.minecraft.world.entity.Entity entity) {
-        return entity.getTags().stream().anyMatch(tag -> tag.startsWith("sunlitmarket."));
+        return MarketRegistry.resolve(entity) != null;
     }
 
     /** {@code /sunlitmarket <name> [faction] [value]} — read or set alignment. */
@@ -227,6 +242,9 @@ public final class SunlitMarketMod {
                 }))
                 .then(Commands.literal("reload").executes(ctx -> {
                     MarketRegistry.loadJson();
+                    com.society.sunlitmarket.core.MarketRules.loadJson();
+                    SunlitMarketConfig.invalidate();
+                    FactionRelations.reload(ctx.getSource().getServer());
                     ctx.getSource().sendSuccess(() -> Component.literal("SunlitMarket config reloaded"), false);
                     return 1;
                 }))

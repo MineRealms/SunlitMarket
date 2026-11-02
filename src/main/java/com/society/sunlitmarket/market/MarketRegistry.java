@@ -26,6 +26,14 @@ public final class MarketRegistry {
     private static final Gson GSON = new GsonBuilder().setLenient().create();
     private static final Map<String, Merchant> JSON = new LinkedHashMap<>();
     private static final Map<String, Merchant> SCRIPTS = new LinkedHashMap<>();
+    private static Map<String, Merchant> staging;
+    private static boolean stagingFailed;
+    public static synchronized void beginScripts() { staging = new LinkedHashMap<>(); stagingFailed = false; }
+    public static synchronized void endScripts(boolean valid) {
+        if (staging != null && valid && !stagingFailed) { SCRIPTS.clear(); SCRIPTS.putAll(staging); }
+        staging = null; changed();
+    }
+    private static Map<String,Merchant> scriptTarget() { return staging == null ? SCRIPTS : staging; }
 
     private MarketRegistry() {
     }
@@ -34,29 +42,28 @@ public final class MarketRegistry {
         return FMLPaths.CONFIGDIR.get().resolve("sunlitmarket").resolve("merchants.json");
     }
 
+    private static long revision;
+    public static synchronized long version() { return revision; }
+    public static synchronized void changed() { revision++; TradeSessions.clear(); }
+
     public static synchronized void loadJson() {
-        JSON.clear();
         Path path = configPath();
-        if (!Files.isRegularFile(path)) return;
+        Map<String, Merchant> candidate = new LinkedHashMap<>();
         try {
-            String text = Files.readString(path, StandardCharsets.UTF_8);
-            JsonElement root = JsonParser.parseString(text);
-            JsonArray array;
-            if (root.isJsonArray()) {
-                array = root.getAsJsonArray();
-            } else if (root.isJsonObject() && root.getAsJsonObject().has("merchants")) {
-                array = root.getAsJsonObject().getAsJsonArray("merchants");
-            } else {
-                return;
+            if (Files.isRegularFile(path)) {
+                JsonElement root = JsonParser.parseString(Files.readString(path, StandardCharsets.UTF_8));
+                JsonArray array = root.isJsonArray() ? root.getAsJsonArray() : root.getAsJsonObject().getAsJsonArray("merchants");
+                if (array == null) throw new IllegalArgumentException("Expected merchants array");
+                for (JsonElement element : array) {
+                    Merchant merchant = Merchant.fromJson(element.getAsJsonObject());
+                    if (!merchant.valid() || candidate.putIfAbsent(merchant.id, merchant) != null)
+                        throw new IllegalArgumentException("Invalid/duplicate merchant " + merchant.id);
+                }
             }
-            for (JsonElement element : array) {
-                if (!element.isJsonObject()) continue;
-                Merchant merchant = Merchant.fromJson(element.getAsJsonObject());
-                if (merchant.valid()) JSON.put(merchant.id, merchant);
-            }
+            JSON.clear(); JSON.putAll(candidate); changed();
             SunlitMarketMod.LOG.info("[SunlitMarket] loaded {} merchants from config", JSON.size());
-        } catch (Throwable t) {
-            SunlitMarketMod.LOG.warn("[SunlitMarket] failed to load config merchants", t);
+        } catch (Exception t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] invalid merchant reload; previous snapshot retained", t);
         }
     }
 
@@ -65,8 +72,10 @@ public final class MarketRegistry {
             JsonElement root = JsonParser.parseString(json);
             if (!root.isJsonObject()) return;
             Merchant merchant = Merchant.fromJson(root.getAsJsonObject());
-            if (merchant.valid()) SCRIPTS.put(merchant.id, merchant);
+            if (!merchant.valid()) throw new IllegalArgumentException("Invalid script merchant");
+            scriptTarget().put(merchant.id, merchant); if (staging == null) changed();
         } catch (Throwable t) {
+            stagingFailed = true;
             SunlitMarketMod.LOG.warn("[SunlitMarket] bad script merchant JSON", t);
         }
     }
@@ -77,23 +86,26 @@ public final class MarketRegistry {
             if (!root.isJsonObject()) return;
             Offer offer = Offer.fromJson(root.getAsJsonObject());
             if (!offer.valid()) return;
-            Merchant merchant = SCRIPTS.get(merchantId);
+            Merchant merchant = scriptTarget().get(merchantId);
             if (merchant == null) {
                 merchant = new Merchant();
                 merchant.id = merchantId;
                 merchant.name = merchantId;
                 merchant.faction = "sunlitmarket:default";
-                SCRIPTS.put(merchantId, merchant);
+                scriptTarget().put(merchantId, merchant);
             }
-            merchant.offers.add(offer);
+            merchant.offers.add(offer); if (staging == null) changed();
         } catch (Throwable t) {
+            stagingFailed = true;
             SunlitMarketMod.LOG.warn("[SunlitMarket] bad script offer JSON", t);
         }
     }
 
     public static synchronized void clearScript() {
-        SCRIPTS.clear();
+        scriptTarget().clear(); if (staging == null) changed();
     }
+
+    public static synchronized void removeScript(String id) { SCRIPTS.remove(id); changed(); }
 
     public static synchronized List<Merchant> all() {
         List<Merchant> list = new ArrayList<>(JSON.values());

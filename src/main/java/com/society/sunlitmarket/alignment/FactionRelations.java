@@ -1,140 +1,88 @@
 package com.society.sunlitmarket.alignment;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import com.society.sunlitmarket.SunlitMarketMod;
+import com.society.sunlitmarket.config.CoreConfig;
 import com.society.sunlitmarket.config.SunlitMarketConfig;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.packs.resources.Resource;
-
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.world.entity.Entity;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
-/**
- * Middle-earth's faction table, read straight out of the data pack.
- *
- * <p>Nothing here links against {@code net.jukoz.me}; the mod only publishes JSON under
- * {@code data/me/me/faction/}. Reading it means faction ids and the hostile graph stay in
- * sync with whatever Middle-earth version the pack ships.</p>
- */
+/** Atomically published resource data; never links to Connector-remapped ME classes. */
 public final class FactionRelations {
-    private static final Set<String> FACTIONS = new HashSet<>();
-    private static final Map<String, Set<String>> HOSTILE = new HashMap<>();
-    private static final Map<String, String> PARENT = new HashMap<>();
-    private static volatile boolean loaded;
-
-    private FactionRelations() {
-    }
-
-    public static void reload(MinecraftServer server) {
-        FACTIONS.clear();
-        HOSTILE.clear();
-        PARENT.clear();
-        loaded = true;
-        if (!SunlitMarketConfig.USE_ME_FACTION_TABLE.get()) {
-            SunlitMarketMod.LOG.info("[SunlitMarket] faction table disabled in config");
-            return;
-        }
+    public record Identity(String faction, String rank) { public boolean civilian() { return "CIVILIAN".equals(rank); } }
+    public record Region(String faction, String dimension, double x, double z, double radius) {}
+    private record Snapshot(Set<String> factions, Map<String,Set<String>> hostile, Map<String,String> parent,
+                            Map<String,Identity> types, List<Region> regions) {}
+    private static volatile Snapshot data = new Snapshot(Set.of(),Map.of(),Map.of(),Map.of(),List.of());
+    private static boolean loaded;
+    private FactionRelations() {}
+    public static void reload(MinecraftServer server) { reload(server.getResourceManager()); }
+    public static void reload(ResourceManager manager) {
+        Set<String> factions = new HashSet<>(); Map<String,Set<String>> hostile = new HashMap<>();
+        Map<String,String> parent = new HashMap<>(); Map<String,Identity> types = new HashMap<>(); List<Region> regions = new ArrayList<>();
         try {
-            Map<ResourceLocation, Resource> files = server.getResourceManager()
-                    .listResources("me/faction", loc -> loc.getPath().endsWith(".json"));
-            for (Map.Entry<ResourceLocation, Resource> file : files.entrySet()) {
-                readOne(file.getKey(), file.getValue());
-            }
-            symmetrize();
-            SunlitMarketMod.LOG.info("[SunlitMarket] faction table: {} factions, {} with hostile entries",
-                    FACTIONS.size(), HOSTILE.size());
-        } catch (Throwable t) {
-            SunlitMarketMod.LOG.warn("[SunlitMarket] could not read the Middle-earth faction table", t);
-        }
-    }
-
-    private static void readOne(ResourceLocation id, Resource resource) {
-        try (InputStreamReader reader = new InputStreamReader(resource.open(), StandardCharsets.UTF_8)) {
-            JsonElement root = JsonParser.parseReader(reader);
-            if (!root.isJsonObject()) return;
-            JsonObject obj = root.getAsJsonObject();
-            String self = obj.has("id") && obj.get("id").isJsonPrimitive()
-                    ? obj.get("id").getAsString()
-                    : id.getNamespace() + ":" + id.getPath().substring("me/faction/".length(), id.getPath().length() - ".json".length());
-            FACTIONS.add(self);
-            if (obj.has("subFactions") && obj.get("subFactions").isJsonArray()) {
-                for (JsonElement sub : obj.getAsJsonArray("subFactions")) {
-                    if (sub.isJsonPrimitive()) PARENT.put(sub.getAsString(), self);
+            Map<ResourceLocation,net.minecraft.server.packs.resources.Resource> files = new LinkedHashMap<>();
+            if (SunlitMarketConfig.USE_ME_FACTION_TABLE.get()) files.putAll(manager.listResources("me/faction", id -> id.getNamespace().equals("me") && id.getPath().endsWith(".json")));
+            files.putAll(manager.listResources("sunlitmarket/factions", id -> id.getPath().endsWith(".json")));
+            for (var file : files.entrySet()) {
+                try (var reader = new InputStreamReader(file.getValue().open(), StandardCharsets.UTF_8)) {
+                    JsonObject o = JsonParser.parseReader(reader).getAsJsonObject();
+                    String self = o.get("id").getAsString(); factions.add(self);
+                    if (o.has("parent_faction")) parent.put(self,o.get("parent_faction").getAsString());
+                    if (o.has("subfaction")) for (JsonElement sub : o.getAsJsonArray("subfaction")) parent.put(sub.getAsString(),self);
+                    if (o.has("initial_diplomacy")) for (JsonElement raw : o.getAsJsonArray("initial_diplomacy")) {
+                        JsonObject rel = raw.getAsJsonObject(); String other = rel.get("faction").getAsString(); factions.add(other);
+                        if ("HOSTILE".equalsIgnoreCase(rel.get("affinity").getAsString())) {
+                            hostile.computeIfAbsent(self,k->new HashSet<>()).add(other);
+                            hostile.computeIfAbsent(other,k->new HashSet<>()).add(self);
+                        }
+                    }
+                    if (o.has("npcs") && o.getAsJsonObject("npcs").has("ranks"))
+                        for (JsonElement raw : o.getAsJsonObject("npcs").getAsJsonArray("ranks")) {
+                            JsonObject rank = raw.getAsJsonObject();
+                            for (JsonElement type : rank.getAsJsonArray("pool")) {
+                                Identity incoming = new Identity(self,rank.get("rank").getAsString());
+                                types.merge(type.getAsString(),incoming,(a,b) -> a.civilian() == b.civilian() ? a : new Identity(self,"UNKNOWN"));
+                            }
+                        }
+                    String dimension = o.has("dimension") ? o.get("dimension").getAsString()
+                            : file.getKey().getNamespace().equals("me") ? "me:middle-earth" : "";
+                    if (!dimension.isBlank() && o.has("spawns")) for (JsonElement raw : o.getAsJsonObject("spawns").getAsJsonArray("data")) {
+                        JsonObject c = raw.getAsJsonObject().getAsJsonObject("coordinates");
+                        regions.add(new Region(self,dimension,c.get("x").getAsDouble(),c.get("z").getAsDouble(),CoreConfig.REGION_RADIUS.get()));
+                    }
                 }
             }
-            if (!obj.has("initial_diplomacy") || !obj.get("initial_diplomacy").isJsonArray()) return;
-            JsonArray diplomacy = obj.getAsJsonArray("initial_diplomacy");
-            for (JsonElement entry : diplomacy) {
-                if (!entry.isJsonObject()) continue;
-                JsonObject rel = entry.getAsJsonObject();
-                if (!rel.has("affinity") || !rel.has("faction")) continue;
-                String affinity = rel.get("affinity").getAsString();
-                String other = rel.get("faction").getAsString();
-                FACTIONS.add(other);
-                if ("HOSTILE".equalsIgnoreCase(affinity)) {
-                    HOSTILE.computeIfAbsent(self, k -> new HashSet<>()).add(other);
-                }
-            }
-        } catch (Throwable ignored) {
-        }
+            Map<String,Set<String>> immutable = new HashMap<>(); hostile.forEach((k,v)->immutable.put(k,Set.copyOf(v)));
+            data = new Snapshot(Set.copyOf(factions),Map.copyOf(immutable),Map.copyOf(parent),Map.copyOf(types),List.copyOf(regions));
+            loaded = true;
+            SunlitMarketMod.LOG.info("[SunlitMarket] faction snapshot: {} factions, {} NPC types, {} regions", factions.size(),types.size(),regions.size());
+        } catch (Exception ex) { SunlitMarketMod.LOG.error("[SunlitMarket] Invalid faction reload; previous snapshot retained",ex); }
     }
-
-    /** Middle-earth only declares one direction; make the graph undirected. */
-    private static void symmetrize() {
-        List<String> keys = new ArrayList<>(HOSTILE.keySet());
-        for (String a : keys) {
-            for (String b : new ArrayList<>(HOSTILE.getOrDefault(a, Collections.emptySet()))) {
-                HOSTILE.computeIfAbsent(b, k -> new HashSet<>()).add(a);
-            }
-        }
-    }
-
-    public static Set<String> hostilesOf(String faction) {
-        if (faction == null) return Collections.emptySet();
-        return HOSTILE.getOrDefault(faction, Collections.emptySet());
-    }
-
-    public static boolean isHostile(String a, String b) {
-        return hostilesOf(a).contains(b);
-    }
-
-    public static Set<String> factions() {
-        return Collections.unmodifiableSet(FACTIONS);
-    }
-
-    public static String parentOf(String faction) {
-        return PARENT.getOrDefault(faction, "");
-    }
-
-    public static boolean isLoaded() {
-        return loaded;
-    }
-
-    /**
-     * Resolves an ME npc type such as {@code me:longbeards.erebor.miner} to its faction
-     * ({@code me:longbeards.erebor}) by longest prefix match, so sub-factions win over
-     * their parents.
-     */
-    public static String factionOfNpcType(String npcType) {
-        if (npcType == null || npcType.isBlank()) return "";
+    public static Set<String> hostilesOf(String f) { return data.hostile.getOrDefault(f,Set.of()); }
+    public static boolean isHostile(String a,String b) { return hostilesOf(a).contains(b); }
+    public static Set<String> factions() { return data.factions; }
+    public static String parentOf(String f) { return data.parent.getOrDefault(f,""); }
+    public static boolean isLoaded() { return loaded; }
+    public static String factionOfNpcType(String type) {
+        if (type == null) return "";
+        Identity known = data.types.get(type); if (known != null) return known.faction;
         String best = "";
-        for (String faction : FACTIONS) {
-            if (faction.isEmpty() || faction.equals(npcType)) continue;
-            if (npcType.startsWith(faction + ".") && faction.length() > best.length()) {
-                best = faction;
-            }
-        }
+        for (String f : data.factions) if (type.startsWith(f + ".") && f.length() > best.length()) best = f;
         return best;
+    }
+    public static Identity identity(String type) { return data.types.getOrDefault(type,new Identity(factionOfNpcType(type),"UNKNOWN")); }
+    public static double regionWeight(String faction, Entity e) {
+        double weight = 0;
+        for (Region r : data.regions) if (r.faction.equals(faction) && r.dimension.equals(e.level().dimension().location().toString())) {
+            double dx=e.getX()-r.x,dz=e.getZ()-r.z;
+            weight=Math.max(weight,Math.max(0,1-Math.sqrt(dx*dx+dz*dz)/r.radius));
+        }
+        return weight;
     }
 }

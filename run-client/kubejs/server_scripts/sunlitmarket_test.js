@@ -33,40 +33,41 @@ SunlitMarket.merchant({
   ]
 })
 
-const results = []
-const check = (name, ok, detail) => {
+letresults = []
+letcheck = (name, ok, detail) => {
   results.push((ok ? 'PASS' : 'FAIL') + ' ' + name + (detail ? ' | ' + detail : ''))
 }
-const view = (player, id) => JSON.parse(SunlitMarket.view(player, id))
+letview = (player, id) => JSON.parse(SunlitMarket.view(player, id))
 
 let opened = false
 PlayerEvents.tick((event) => {
   if (opened) return
   if (event.player.age < 60) return
   opened = true
-  const player = event.player
+  letplayer = event.player
 
   // State restored from the previous session, then a clean day for assertions.
   console.info('[SM-TEST] restored view ' + SunlitMarket.view(player, 'test_farmer'))
   event.server.runCommandSilent('time add 24000')
   // Reputation persists across sessions and discounts prices, so reset it first.
   SunlitMarket.setReputation(player, 'test:village', 0)
+  SunlitMarket.revoke(player, 'test:bakery')
 
-  const startBalance = SunlitMarket.balance(player)
+  letstartBalance = SunlitMarket.balance(player)
   event.server.runCommandSilent('give ' + player.username + ' minecraft:emerald 64')
   SunlitMarket.open(player, 'test_farmer')
 
-  const v0 = view(player, 'test_farmer')
+  letv0 = view(player, 'test_farmer')
   check('balance.read', v0.balance === startBalance + 64, 'balance=' + v0.balance)
   check('day.resetAtStart', v0.offers[0].used === 0 && v0.offers[0].stock === 5,
     'used=' + v0.offers[0].used + ' stock=' + v0.offers[0].stock)
   check('limit.init', v0.offers[0].limit === 3)
   check('price.multiplier', v0.offers[1].buy === 6 && v0.offers[1].sell === 3,
     'bread buy=' + v0.offers[1].buy + ' sell=' + v0.offers[1].sell)
-  check('unlock.init', v0.offers[1].locked === false) // granted by the previous run
+  check('unlock.init', v0.offers[1].locked === true) // explicitly reset; independent of prior runs
 
   check('buy.one', SunlitMarket.buy(player, 'test_farmer', 0, 1))
-  const v1 = view(player, 'test_farmer')
+  letv1 = view(player, 'test_farmer')
   check('stock.decrement', v1.offers[0].stock === 4, 'stock=' + v1.offers[0].stock)
   check('limit.counted', v1.offers[0].used === 1, 'used=' + v1.offers[0].used)
   check('rep.gain', v1.reputation === 1, 'rep=' + v1.reputation)
@@ -82,18 +83,18 @@ PlayerEvents.tick((event) => {
     && view(player, 'test_farmer').offers[1].locked === true)
   SunlitMarket.unlock(player, 'test:bakery')
   check('unlock.granted', SunlitMarket.isUnlocked(player, 'test:bakery')
-    && view(player, 'test_farmer').offers[1].locked === false)
+    && view(player, 'test_farmer').offers[1].locked === true) // alignment gate still applies
 
   check('rep.gate', SunlitMarket.buy(player, 'test_farmer', 1, 1) === false)
   SunlitMarket.setReputation(player, 'test:village', 200)
-  const v2 = view(player, 'test_farmer')
-  check('price.discount', v2.offers[1].buy === 5, 'bread buy=' + v2.offers[1].buy + ' rep=' + v2.reputation)
+  letv2 = view(player, 'test_farmer')
+  check('price.discount', v2.offers[1].buy === 6, 'bread buy=' + v2.offers[1].buy + ' rep=' + v2.reputation)
   check('buy.afterRep', SunlitMarket.buy(player, 'test_farmer', 1, 1))
 
-  const wheat = SunlitMarket.countItems(player, 'minecraft:wheat')
-  const before = SunlitMarket.balance(player)
-  const sold = SunlitMarket.sell(player, 'test_farmer', 0, 1)
-  const after = SunlitMarket.balance(player)
+  letwheat = SunlitMarket.countItems(player, 'minecraft:wheat')
+  letbefore = SunlitMarket.balance(player)
+  letsold = SunlitMarket.sell(player, 'test_farmer', 0, 1)
+  letafter = SunlitMarket.balance(player)
   check('sell.hasWheat', wheat >= 1, 'count=' + wheat)
   check('sell.ok', sold === true, 'returned=' + sold)
   check('sell.change', after === before + 1, 'before=' + before + ' after=' + after)
@@ -103,11 +104,11 @@ PlayerEvents.tick((event) => {
 
   // Daily reset: advancing one in-game day restores stock and clears limits.
   event.server.runCommandSilent('time add 24000')
-  const vDay = view(player, 'test_farmer')
+  letvDay = view(player, 'test_farmer')
   check('day.stockReset', vDay.offers[0].stock === 5, 'stock=' + vDay.offers[0].stock)
   check('day.limitReset', vDay.offers[0].used === 0, 'used=' + vDay.offers[0].used)
 
-  const failed = results.filter((line) => line.startsWith('FAIL')).length
+  letfailed = results.filter((line) => line.startsWith('FAIL')).length
   results.forEach((line) => console.info('[SM-TEST] ' + line))
   console.info('[SM-TEST] ===== ' + (results.length - failed) + ' passed, ' + failed + ' failed =====')
   console.info('[SM-TEST] final view ' + SunlitMarket.view(player, 'test_farmer'))

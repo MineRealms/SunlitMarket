@@ -295,6 +295,22 @@ public final class SunlitMarketBinding {
         return MarketRegistry.toJson(MarketRegistry.all());
     }
 
+    public void rule(Object spec) { com.society.sunlitmarket.core.MarketRules.add(toJson(spec)); }
+    public void clearRules() { com.society.sunlitmarket.core.MarketRules.clearScripts(); }
+    public int heat(net.minecraft.world.item.ItemStack stack) { return com.society.sunlitmarket.crime.CrimeService.heat(stack); }
+    public void markStolen(net.minecraft.world.item.ItemStack stack, int heat) {
+        var server=net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+        if(server!=null) com.society.sunlitmarket.crime.CrimeService.mark(stack,heat,server.overworld().getDayTime()/24000L,"");
+    }
+    public String owner(Player player) { return AlignmentData.ownerKey(player); }
+    /** Saved snapshot only, not a live authoritative allegiance assertion. */
+    public String playerFaction(Player player) { return player instanceof ServerPlayer p ? com.society.sunlitmarket.compat.MiddleEarthCompat.savedFaction(p) : "UNKNOWN"; }
+    public String identity(net.minecraft.world.entity.Entity entity) {
+        var i=com.society.sunlitmarket.core.MarketRules.identity(entity);
+        return i.faction()+" / "+i.rank()+" / customer="+i.customer()+" / enforcer="+i.enforcer();
+    }
+    public double regionWeight(net.minecraft.world.entity.Entity entity,String faction) { return FactionRelations.regionWeight(faction,entity); }
+
     private static String toJson(Object value) {
         if (value instanceof CharSequence text) return text.toString();
         Context context = Context.enter();

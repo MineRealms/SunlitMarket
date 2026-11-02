@@ -1,14 +1,14 @@
 package com.society.sunlitmarket.currency;
 
 import com.society.sunlitmarket.SunlitMarketMod;
+import com.society.sunlitmarket.core.TradeMath;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraftforge.fml.ModList;
-
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -16,194 +16,179 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Numismatics bank when present; otherwise coin items (emerald by default for the dev harness).
- * No compile-time dependency on Numismatics.
- */
+/** Prepared inventory settlement. An installed but failing bank never silently switches backend. */
 public final class Currency {
     private static final Map<String, Integer> VALUES = new LinkedHashMap<>();
-
-    static {
-        VALUES.put("numismatics:spur", 1);
-        VALUES.put("numismatics:bevel", 8);
-        VALUES.put("numismatics:sprocket", 16);
-        VALUES.put("numismatics:cog", 64);
-        VALUES.put("numismatics:crown", 512);
-        VALUES.put("numismatics:sun", 4096);
-        VALUES.put("numismatics:neptunium_coin", 32768);
-        VALUES.put("numismatics:ancient_coin", 262144);
-        VALUES.put("numismatics:prismatic_coin", 16777216);
-        // Dev harness fallback; KubeJS can override or remove this.
-        VALUES.put("minecraft:emerald", 1);
+    private static Map<String, Integer> staging;
+    static { resetValues(); }
+    private Currency() {}
+    private static Map<String,Integer> target() { return staging == null ? VALUES : staging; }
+    private static void defaults(Map<String,Integer> values) {
+        values.put("numismatics:spur", 1); values.put("numismatics:bevel", 8);
+        values.put("numismatics:sprocket", 16); values.put("numismatics:cog", 64);
+        values.put("numismatics:crown", 512); values.put("numismatics:sun", 4096);
+        values.put("numismatics:neptunium_coin", 32768); values.put("numismatics:ancient_coin", 262144);
+        values.put("numismatics:prismatic_coin", 16777216); values.put("minecraft:emerald", 1);
     }
-
-    private Currency() {
+    public static synchronized void beginScripts() { staging = new LinkedHashMap<>(); defaults(staging); }
+    public static synchronized void endScripts(boolean valid) {
+        if (staging != null && valid) { VALUES.clear(); VALUES.putAll(staging); }
+        staging = null;
     }
-
-    public static synchronized void setCoinValue(String item, int value) {
-        if (item == null || item.isBlank()) return;
-        if (value <= 0) VALUES.remove(item);
-        else VALUES.put(item, value);
+    public static synchronized void resetValues() {
+        Map<String,Integer> values=target(); values.clear(); defaults(values);
     }
-
-    public static synchronized int coinValue(String item) {
-        return VALUES.getOrDefault(item, 0);
+    public static synchronized void setCoinValue(String id, int value) {
+        if (ResourceLocation.tryParse(id) == null) throw new IllegalArgumentException("Invalid coin id");
+        if (value <= 0) target().remove(id); else target().put(id, value);
     }
-
-    public static synchronized List<Map.Entry<String, Integer>> denominations() {
-        List<Map.Entry<String, Integer>> list = new ArrayList<>(VALUES.entrySet());
-        list.sort(Map.Entry.<String, Integer>comparingByValue().reversed());
-        return list;
+    public static synchronized int coinValue(String id) { return VALUES.getOrDefault(id, 0); }
+    public static synchronized List<Map.Entry<String,Integer>> denominations() {
+        List<Map.Entry<String,Integer>> result = new ArrayList<>(VALUES.entrySet());
+        result.sort(Map.Entry.<String,Integer>comparingByValue(Comparator.reverseOrder())); return result;
     }
-
-    private static Object bankAccount(Player player) {
+    private record Bank(Object account, int balance, Method setter) {}
+    private static Bank bank(Player player) throws ReflectiveOperationException {
         if (!ModList.get().isLoaded("numismatics")) return null;
-        try {
-            Class<?> numismatics = Class.forName("dev.ithundxr.createnumismatics.Numismatics");
-            Field bankField = numismatics.getField("BANK");
-            Object bank = bankField.get(null);
-            if (bank == null) return null;
-            for (Method method : bank.getClass().getMethods()) {
-                if (!method.getName().equals("getAccount") || method.getParameterCount() != 1) continue;
-                Class<?> parameter = method.getParameterTypes()[0];
-                if (parameter == Player.class) return method.invoke(bank, player);
-                if (parameter == java.util.UUID.class) return method.invoke(bank, player.getUUID());
-            }
-        } catch (Throwable ignored) {
+        Class<?> mod = Class.forName("dev.ithundxr.createnumismatics.Numismatics");
+        Object bank = mod.getField("BANK").get(null);
+        if (bank == null) throw new IllegalStateException("Bank is not ready");
+        Object account = null;
+        for (Method m : bank.getClass().getMethods()) {
+            if (!m.getName().equals("getAccount") || m.getParameterCount() != 1) continue;
+            if (m.getParameterTypes()[0] == java.util.UUID.class) { account = m.invoke(bank, player.getUUID()); break; }
+            if (m.getParameterTypes()[0] == Player.class) { account = m.invoke(bank, player); break; }
         }
-        return null;
+        if (account == null) throw new IllegalStateException("Bank account unavailable");
+        int balance = TradeMath.amount(((Number) account.getClass().getMethod("getBalance").invoke(account)).longValue());
+        return new Bank(account, balance, account.getClass().getMethod("setBalance", int.class));
     }
-
-    private static int accountBalance(Object account) {
-        try {
-            return ((Number) account.getClass().getMethod("getBalance").invoke(account)).intValue();
-        } catch (Throwable t) {
-            return -1;
-        }
-    }
-
-    /** @return true when the bank accepted the new balance. */
-    private static boolean setAccountBalance(Object account, int value) {
-        try {
-            account.getClass().getMethod("setBalance", int.class).invoke(account, value);
-            return true;
-        } catch (Throwable t) {
-            SunlitMarketMod.LOG.warn("[SunlitMarket] bank setBalance failed, falling back to coin items", t);
-            return false;
-        }
-    }
-
     public static int balance(Player player) {
-        Object account = bankAccount(player);
-        if (account != null) {
-            int balance = accountBalance(account);
-            if (balance >= 0) return balance;
-        }
-        return coinBalance(player);
+        try { Bank b = bank(player); return b == null ? coinBalance(player) : b.balance; }
+        catch (ReflectiveOperationException | RuntimeException ex) { return -1; }
     }
-
-    public static boolean pay(Player player, int amount) {
-        if (amount <= 0) return true;
-        Object account = bankAccount(player);
-        if (account != null) {
-            int balance = accountBalance(account);
-            if (balance < amount) return false;
-            if (setAccountBalance(account, balance - amount)) return true;
-        }
-        return payCoins(player, amount);
-    }
-
-    public static void give(Player player, int amount) {
-        if (amount <= 0) return;
-        Object account = bankAccount(player);
-        if (account != null) {
-            int balance = accountBalance(account);
-            if (balance >= 0 && setAccountBalance(account, balance + amount)) return;
-        }
-        giveCoins(player, amount);
-    }
-
     public static int coinBalance(Player player) {
-        int total = 0;
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack stack = player.getInventory().getItem(i);
-            int value = coinValue(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
-            if (value > 0) total += value * stack.getCount();
-        }
-        return total;
+        long sum = 0;
+        for (ItemStack s : snapshot(player.getInventory())) if (!s.hasTag())
+            sum += (long) coinValue(BuiltInRegistries.ITEM.getKey(s.getItem()).toString()) * s.getCount();
+        return (int) Math.min(Integer.MAX_VALUE, sum);
     }
-
-    private static boolean payCoins(Player player, int amount) {
-        if (coinBalance(player) < amount) return false;
-        int paid = 0;
-        for (int i = 0; i < player.getInventory().getContainerSize() && paid < amount; i++) {
-            ItemStack stack = player.getInventory().getItem(i);
-            int value = coinValue(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
-            if (value <= 0 || stack.isEmpty()) continue;
-            while (!stack.isEmpty() && paid < amount) {
-                int need = amount - paid;
-                int take = Math.min(stack.getCount(), Math.max(1, (need + value - 1) / value));
-                stack.shrink(take);
-                paid += take * value;
+    public static List<ItemStack> snapshot(Container container) {
+        List<ItemStack> result = new ArrayList<>();
+        for (int i = 0; i < container.getContainerSize(); i++) result.add(container.getItem(i).copy());
+        return result;
+    }
+    private static void commit(Container c, List<ItemStack> slots) {
+        for (int i = 0; i < slots.size(); i++) c.setItem(i, slots.get(i));
+        c.setChanged();
+    }
+    public static boolean insert(List<ItemStack> slots, ItemStack template, int count, int limit) {
+        if (template.isEmpty() || count <= 0) return false;
+        int max = Math.min(limit, template.getMaxStackSize());
+        for (int i = 0; i < slots.size() && count > 0; i++) {
+            ItemStack s = slots.get(i);
+            if (!s.isEmpty() && ItemStack.isSameItemSameTags(s, template)) {
+                int n = Math.min(count, Math.max(0, max - s.getCount())); s.grow(n); count -= n;
             }
         }
-        if (paid > amount) giveCoins(player, paid - amount);
-        return paid >= amount;
+        for (int i = 0; i < slots.size() && count > 0; i++) if (slots.get(i).isEmpty()) {
+            ItemStack s = template.copy(); int n = Math.min(count, max); s.setCount(n); slots.set(i, s); count -= n;
+        }
+        return count == 0;
     }
-
-    private static void giveCoins(Player player, int amount) {
-        for (Map.Entry<String, Integer> denomination : denominations()) {
-            int value = denomination.getValue();
-            if (value <= 0 || amount < value) continue;
-            // Resolve the item before spending the amount: a denomination that is not
-            // installed (numismatics:spur in a dev instance) would otherwise eat the
-            // change and the player receives nothing.
-            Item item = BuiltInRegistries.ITEM.get(new ResourceLocation(denomination.getKey()));
-            if (item == null || item == net.minecraft.world.item.Items.AIR) continue;
-            int count = amount / value;
-            if (count <= 0) continue;
-            amount -= count * value;
-            while (count > 0) {
-                int give = Math.min(64, count);
-                count -= give;
-                ItemStack stack = new ItemStack(item, give);
-                if (!player.getInventory().add(stack)) player.drop(stack, false);
+    private static boolean remove(List<ItemStack> slots, ItemStack template, int count) {
+        if (count <= 0) return false;
+        for (ItemStack s : slots) if (ItemStack.isSameItemSameTags(s, template)) {
+            int n = Math.min(count, s.getCount()); s.shrink(n); count -= n; if (count == 0) return true;
+        }
+        return false;
+    }
+    private static boolean coins(List<ItemStack> slots, int delta) {
+        if (delta < 0) {
+            long paid = 0, needed = -(long) delta;
+            for (ItemStack s : slots) {
+                int value = s.hasTag() ? 0 : coinValue(BuiltInRegistries.ITEM.getKey(s.getItem()).toString());
+                if (value <= 0 || paid >= needed) continue;
+                int n = (int) Math.min(s.getCount(), (needed - paid + value - 1L) / value);
+                s.shrink(n); paid += (long) n * value;
             }
+            if (paid < needed) return false;
+            return mint(slots, paid - needed);
         }
-        if (amount > 0) {
-            SunlitMarketMod.LOG.warn("[SunlitMarket] cannot make change for {} spur(s): no installed denomination",
-                    amount);
+        return mint(slots, delta);
+    }
+    private static boolean mint(List<ItemStack> slots, long amount) {
+        for (var d : denominations()) {
+            ResourceLocation id = ResourceLocation.tryParse(d.getKey());
+            if (id == null || !BuiltInRegistries.ITEM.containsKey(id)) continue;
+            ItemStack template = new ItemStack(BuiltInRegistries.ITEM.get(id));
+            if (template.isEmpty()) continue;
+            long n = amount / d.getValue();
+            if (n > Integer.MAX_VALUE || (n > 0 && !insert(slots, template, (int) n, 64))) return false;
+            amount -= n * d.getValue();
+        }
+        return amount == 0;
+    }
+    /** Positive moneyDelta pays the player. null source/target represents virtual stock. */
+    public static String settle(Player player, Container source, Container target, ItemStack item, int count, int moneyDelta) {
+        if (player.level().isClientSide) return "Server-only transaction";
+        if (count < 0 || (count > 0 && item.isEmpty())) return "Invalid goods";
+        Container wallet = player.getInventory();
+        Map<Container,List<ItemStack>> plans = new java.util.IdentityHashMap<>();
+        plans.put(wallet, snapshot(wallet));
+        if (source != null) plans.computeIfAbsent(source, Currency::snapshot);
+        if (target != null) plans.computeIfAbsent(target, Currency::snapshot);
+        if (count > 0 && source != null && !remove(plans.get(source), item, count)) return "物品不足或物品数据不匹配";
+        // Only main inventory slots accept newly delivered goods/coins, not armor/offhand.
+        List<ItemStack> walletMain = plans.get(wallet).subList(0, Math.min(36, plans.get(wallet).size()));
+        Bank b = null;
+        boolean bankAttempted = false;
+        Map<Container,List<ItemStack>> originals = new java.util.IdentityHashMap<>();
+        plans.keySet().forEach(c -> originals.put(c,snapshot(c)));
+        try {
+            if (player.getPersistentData().getBoolean("sunlitmarket.bankUncertain")) return "银行需管理员核对后解锁";
+            b = moneyDelta == 0 ? null : bank(player);
+            int next = b == null ? 0 : TradeMath.amount((long) b.balance + moneyDelta);
+            if (b == null && !coins(walletMain, moneyDelta)) return "余额不足、无法精确找零或背包空间不足";
+            if (count > 0 && target != null && !insert(target == wallet ? walletMain : plans.get(target), item, count, target.getMaxStackSize()))
+                return "目标库存空间不足";
+            if (b != null) {
+                bankAttempted = true;
+                b.setter.invoke(b.account, next);
+                long observed = ((Number) b.account.getClass().getMethod("getBalance").invoke(b.account)).longValue();
+                if (observed != next) throw new IllegalStateException("Bank write was not confirmed");
+            }
+            plans.forEach(Currency::commit);
+            player.getInventory().setChanged();
+            return "";
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            originals.forEach(Currency::commit);
+            boolean restored = !bankAttempted;
+            if (bankAttempted && b != null) try {
+                b.setter.invoke(b.account,b.balance);
+                restored = ((Number)b.account.getClass().getMethod("getBalance").invoke(b.account)).longValue() == b.balance;
+            } catch (ReflectiveOperationException | RuntimeException restoreFailure) { ex.addSuppressed(restoreFailure); }
+            if (!restored) player.getPersistentData().putBoolean("sunlitmarket.bankUncertain",true);
+            SunlitMarketMod.LOG.error("[SunlitMarket] Settlement aborted; inventory restored, bankRestored={}", restored, ex);
+            return restored ? "交易未完成，库存与余额已保留" : "银行结果不明，交易已锁定，请管理员核对";
         }
     }
-
-    public static int countItems(Player player, String itemId) {
-        int count = 0;
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack stack = player.getInventory().getItem(i);
-            if (BuiltInRegistries.ITEM.getKey(stack.getItem()).toString().equals(itemId)) count += stack.getCount();
-        }
-        return count;
+    public static boolean pay(Player player, int amount) {
+        return amount >= 0 && settle(player, null, null, ItemStack.EMPTY, 0, -amount).isEmpty();
     }
-
-    public static boolean removeItems(Player player, String itemId, int count) {
-        if (count <= 0) return true;
-        if (countItems(player, itemId) < count) return false;
-        int left = count;
-        for (int i = 0; i < player.getInventory().getContainerSize() && left > 0; i++) {
-            ItemStack stack = player.getInventory().getItem(i);
-            if (!BuiltInRegistries.ITEM.getKey(stack.getItem()).toString().equals(itemId)) continue;
-            int take = Math.min(left, stack.getCount());
-            stack.shrink(take);
-            left -= take;
-        }
-        return left == 0;
+    public static void give(Player player, int amount) {
+        if (amount < 0 || !settle(player, null, null, ItemStack.EMPTY, 0, amount).isEmpty())
+            throw new IllegalStateException("Payment could not be completed");
     }
-
-    public static boolean giveItem(Player player, String itemId, int count) {
-        Item item = BuiltInRegistries.ITEM.get(new ResourceLocation(itemId));
-        if (item == null || item == net.minecraft.world.item.Items.AIR) return false;
-        ItemStack stack = new ItemStack(item, Math.max(1, count));
-        if (!player.getInventory().add(stack)) player.drop(stack, false);
-        return true;
+    public static ItemStack item(String id) {
+        ResourceLocation key = ResourceLocation.tryParse(id);
+        return key == null || !BuiltInRegistries.ITEM.containsKey(key) ? ItemStack.EMPTY : new ItemStack(BuiltInRegistries.ITEM.get(key));
     }
+    public static int countItems(Player player, String id) {
+        long n = 0; ItemStack template = item(id);
+        for (ItemStack s : snapshot(player.getInventory())) if (ItemStack.isSameItemSameTags(s, template)) n += s.getCount();
+        return (int) Math.min(Integer.MAX_VALUE, n);
+    }
+    public static boolean removeItems(Player p, String id, int n) { return n > 0 && settle(p, p.getInventory(), null, item(id), n, 0).isEmpty(); }
+    public static boolean giveItem(Player p, String id, int n) { return n > 0 && settle(p, null, p.getInventory(), item(id), n, 0).isEmpty(); }
 }

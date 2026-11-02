@@ -114,10 +114,11 @@ public final class SunlitMarketConfig {
                 String[] parts = s.split("\\|");
                 if (parts.length < 4) continue;
                 try {
-                    parsed.add(new Tier(Integer.parseInt(parts[0].trim()),
-                            Double.parseDouble(parts[1].trim()),
-                            Double.parseDouble(parts[2].trim()),
-                            parts[3].trim()));
+                    double buy = Double.parseDouble(parts[1].trim());
+                    double sell = Double.parseDouble(parts[2].trim());
+                    if (!Double.isFinite(buy) || !Double.isFinite(sell) || buy <= 0 || sell <= 0 || buy > 100 || sell > 100)
+                        throw new NumberFormatException("Invalid tier multiplier");
+                    parsed.add(new Tier(Integer.parseInt(parts[0].trim()), buy, sell, parts[3].trim()));
                 } catch (NumberFormatException ignored) {
                 }
             }

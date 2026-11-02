@@ -27,7 +27,7 @@ minecraft {
             }
         }
         server {
-            workingDirectory project.file('run-server')
+            workingDirectory project.file(project.hasProperty('coreMinimal') ? 'run-minimal' : 'run-server')
             args '--nogui'
         }
     }
@@ -44,9 +44,13 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     compileOnly fg.deobf("dev.latvian.mods:kubejs-forge:${kubejs_version}")
     compileOnly fg.deobf("dev.latvian.mods:rhino-forge:${rhino_version}")
-    runtimeOnly fg.deobf("dev.latvian.mods:kubejs-forge:${kubejs_version}")
-    runtimeOnly fg.deobf("dev.latvian.mods:rhino-forge:${rhino_version}")
-    runtimeOnly fg.deobf("dev.architectury:architectury-forge:${architectury_version}")
+    if (!project.hasProperty('coreMinimal')) {
+        runtimeOnly fg.deobf("dev.latvian.mods:kubejs-forge:${kubejs_version}")
+        runtimeOnly fg.deobf("dev.latvian.mods:rhino-forge:${rhino_version}")
+        runtimeOnly fg.deobf("dev.architectury:architectury-forge:${architectury_version}")
+    }
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('processResources', ProcessResources).configure {
@@ -78,6 +82,8 @@ tasks.named('jar', Jar).configure {
         )
     }
 }
+
+tasks.named('test', Test).configure { useJUnitPlatform() }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'

@@ -20,7 +20,7 @@ public final class LimitData extends SavedData {
     }
 
     public void roll(long currentDay) {
-        if (day != currentDay) {
+        if (day == Long.MIN_VALUE || currentDay > day) {
             used.clear();
             day = currentDay;
             setDirty();
@@ -28,18 +28,28 @@ public final class LimitData extends SavedData {
     }
 
     public int used(Player player, String key) {
+        return used(player, key, null);
+    }
+
+    /** Moves an explicitly identified legacy index key without resetting the daily allowance. */
+    public int used(Player player, String key, String legacyKey) {
         Map<String, Integer> map = used.get(player.getUUID());
-        return map == null ? 0 : map.getOrDefault(key, 0);
+        if (map == null) return 0;
+        if (legacyKey != null && !legacyKey.equals(key) && !map.containsKey(key) && map.containsKey(legacyKey)) {
+            map.put(key, map.remove(legacyKey));
+            setDirty();
+        }
+        return map.getOrDefault(key, 0);
     }
 
     public boolean canBuy(Player player, String key, int limit, int quantity) {
         if (limit < 0) return true;
-        return used(player, key) + quantity <= limit;
+        return quantity > 0 && (long) used(player, key) + quantity <= limit;
     }
 
     public void add(Player player, String key, int quantity) {
         used.computeIfAbsent(player.getUUID(), k -> new HashMap<>())
-                .merge(key, quantity, Integer::sum);
+                .merge(key, quantity, (a,b) -> com.society.sunlitmarket.core.TradeMath.clamp((long)a+b,0,Integer.MAX_VALUE));
         setDirty();
     }
 

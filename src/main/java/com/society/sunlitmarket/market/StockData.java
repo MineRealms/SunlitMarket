@@ -18,7 +18,7 @@ public final class StockData extends SavedData {
     }
 
     public void roll(long currentDay) {
-        if (day != currentDay) {
+        if (day == Long.MIN_VALUE || currentDay > day) {
             current.clear();
             day = currentDay;
             setDirty();
@@ -26,7 +26,16 @@ public final class StockData extends SavedData {
     }
 
     public int get(String key, int initial) {
+        return get(key, null, initial);
+    }
+
+    /** Moves an explicitly identified legacy index key without replenishing stock. */
+    public int get(String key, String legacyKey, int initial) {
         if (initial < 0) return -1;
+        if (legacyKey != null && !legacyKey.equals(key) && !current.containsKey(key) && current.containsKey(legacyKey)) {
+            current.put(key, current.remove(legacyKey));
+            setDirty();
+        }
         return Math.max(0, current.getOrDefault(key, initial));
     }
 

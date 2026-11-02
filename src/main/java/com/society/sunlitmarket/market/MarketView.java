@@ -14,6 +14,8 @@ public final class MarketView {
     public String merchantId = "";
     public String merchantName = "";
     public String faction = "";
+    public String session = "";
+    public long sequence;
     public int balance;
     public int reputation;
     /** Alignment tier title for the interacting faction, e.g. 常客. */
@@ -21,6 +23,8 @@ public final class MarketView {
     public List<Line> offers = new ArrayList<>();
 
     public static final class Line {
+        public String offerId = "";
+        public boolean hasReputation;
         public String item = "";
         public int count = 1;
         public int buy;
@@ -42,12 +46,16 @@ public final class MarketView {
         o.addProperty("merchantId", merchantId);
         o.addProperty("merchantName", merchantName);
         o.addProperty("faction", faction);
+        o.addProperty("session", session);
+        o.addProperty("sequence", sequence);
         o.addProperty("balance", balance);
         o.addProperty("reputation", reputation);
         o.addProperty("title", title);
         JsonArray array = new JsonArray();
         for (Line line : offers) {
             JsonObject f = new JsonObject();
+            f.addProperty("offerId", line.offerId);
+            f.addProperty("hasReputation", line.hasReputation);
             f.addProperty("item", line.item);
             f.addProperty("count", line.count);
             f.addProperty("buy", line.buy);
@@ -73,6 +81,8 @@ public final class MarketView {
             view.merchantId = o.has("merchantId") ? o.get("merchantId").getAsString() : "";
             view.merchantName = o.has("merchantName") ? o.get("merchantName").getAsString() : "";
             view.faction = o.has("faction") ? o.get("faction").getAsString() : "";
+            view.session = o.has("session") ? o.get("session").getAsString() : "";
+            view.sequence = o.has("sequence") ? o.get("sequence").getAsLong() : 0;
             view.balance = o.has("balance") ? o.get("balance").getAsInt() : 0;
             view.reputation = o.has("reputation") ? o.get("reputation").getAsInt() : 0;
             view.title = o.has("title") ? o.get("title").getAsString() : "";
@@ -81,6 +91,8 @@ public final class MarketView {
                     if (!e.isJsonObject()) continue;
                     JsonObject f = e.getAsJsonObject();
                     Line line = new Line();
+                    line.offerId = f.has("offerId") ? f.get("offerId").getAsString() : "legacy:" + view.offers.size();
+                    line.hasReputation = f.has("hasReputation") && f.get("hasReputation").getAsBoolean();
                     line.item = f.has("item") ? f.get("item").getAsString() : "";
                     line.count = f.has("count") ? f.get("count").getAsInt() : 1;
                     line.buy = f.has("buy") ? f.get("buy").getAsInt() : 0;

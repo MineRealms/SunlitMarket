@@ -33,7 +33,10 @@ public final class Merchant {
             for (JsonElement e : array) {
                 if (e.isJsonObject()) {
                     Offer offer = Offer.fromJson(e.getAsJsonObject());
-                    if (offer.valid()) m.offers.add(offer);
+                    if (!offer.valid()) throw new IllegalArgumentException("Invalid offer in " + m.id);
+                    if (!offer.id.isBlank() && m.offers.stream().anyMatch(existing -> existing.id.equals(offer.id)))
+                        throw new IllegalArgumentException("Duplicate offer id: " + offer.id);
+                    m.offers.add(offer);
                 }
             }
         }
