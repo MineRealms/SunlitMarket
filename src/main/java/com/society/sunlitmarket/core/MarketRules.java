@@ -19,8 +19,16 @@ public final class MarketRules {
     public record Identity(String faction,String rank,boolean enforcer) {
         public boolean customer() { return !enforcer && rank.equals("CIVILIAN") && !faction.isBlank(); }
     }
+    /**
+     * One kind of counter request. {@code direction} is "sell" (the NPC sells goods to the player,
+     * the original behaviour), "buy" (the NPC consumes goods from the counter and pays out of the
+     * NPC daily budget at {@code bidPrice}) or "both".
+     */
     public record Pool(String id,String faction,String item,int count,int baseValue,int marketValue,int askPrice,
-                       int heat,int wanted,int reward,String nbt) {}
+                       int heat,int wanted,int reward,String nbt,String direction,int bidPrice) {
+        public boolean sells() { return !direction.equals("buy"); }
+        public boolean buys() { return direction.equals("buy")||direction.equals("both"); }
+    }
     public record Law(String id,String faction,String dimension,String item,String tag,int tier) {
         public boolean matches(ItemStack stack,String f,String dim) {
             if (!faction.isBlank() && !faction.equals(f) || !dimension.isBlank() && !dimension.equals(dim)) return false;
@@ -79,6 +87,9 @@ public final class MarketRules {
             if(market>10000000 || ask>10000000 || number(o,"heat",0)<0 || number(o,"heat",0)>10000
                     || number(o,"repGain",1)<0 || number(o,"repGain",1)>100 || number(o,"wanted",5)<0 || number(o,"wanted",5)>10000)
                 throw new IllegalArgumentException("Pool value out of range");
+            if(!Set.of("","sell","buy","both").contains(text(o,"direction"))) throw new IllegalArgumentException("Pool direction must be sell, buy or both");
+            int bid=number(o,"bidPrice",market);
+            if(bid<1||bid>10000000) throw new IllegalArgumentException("Pool bidPrice out of range");
             if(!text(o,"nbt").isBlank()) try { net.minecraft.nbt.TagParser.parseTag(text(o,"nbt")); }
             catch(com.mojang.brigadier.exceptions.CommandSyntaxException ex) { throw new IllegalArgumentException("Invalid pool NBT",ex); }
         }
@@ -132,7 +143,8 @@ public final class MarketRules {
         for(JsonObject o:all()) if(text(o,"type").equals("pool") && (text(o,"faction").isBlank()||text(o,"faction").equals(faction))) {
             int base=number(o,"baseValue",1),market=number(o,"marketValue",base);
             result.add(new Pool(text(o,"id"),text(o,"faction"),text(o,"item"),number(o,"count",1),base,market,
-                    number(o,"askPrice",market),number(o,"heat",0),number(o,"wanted",5),number(o,"repGain",1),text(o,"nbt")));
+                    number(o,"askPrice",market),number(o,"heat",0),number(o,"wanted",5),number(o,"repGain",1),text(o,"nbt"),
+                    text(o,"direction").isBlank()?"sell":text(o,"direction"),number(o,"bidPrice",market)));
         }
         for (var merchant : MarketRegistry.all()) if (merchant.faction.equals(faction)) {
             for (int i=0;i<merchant.offers.size();i++) {
@@ -140,7 +152,7 @@ public final class MarketRules {
                 if (!offer.kind.equals("offer")) continue;
                 String id="merchant:"+merchant.id+":"+(offer.id.isBlank()?"legacy:"+i:offer.id);
                 result.add(new Pool(id,faction,offer.item,offer.count,offer.baseValue,offer.marketValue,offer.askPrice,
-                        offer.heat,5,offer.repGain,offer.nbt));
+                        offer.heat,5,offer.repGain,offer.nbt,"sell",offer.marketValue));
             }
         }
         return result;

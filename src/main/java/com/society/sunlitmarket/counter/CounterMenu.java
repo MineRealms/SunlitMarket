@@ -55,7 +55,7 @@ public final class CounterMenu extends AbstractContainerMenu {
         o.addProperty("owner",counter.owner()==null?"":counter.owner().key());o.addProperty("message",message);
         JsonArray rows=new JsonArray();
         for(CustomerRequest r:counter.requests){JsonObject x=new JsonObject();x.addProperty("id",r.id.toString());x.addProperty("item",net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(r.goods.getItem()).toString());
-            x.addProperty("count",r.goods.getCount());x.addProperty("faction",r.faction);x.addProperty("base",r.base);x.addProperty("market",r.market);x.addProperty("ask",r.ask);x.addProperty("negotiated",r.negotiated);x.addProperty("seconds",Math.max(0,(r.expires-p.server.overworld().getGameTime())/20));rows.add(x);}
+            x.addProperty("count",r.goods.getCount());x.addProperty("faction",r.faction);x.addProperty("base",r.base);x.addProperty("market",r.market);x.addProperty("ask",r.ask);x.addProperty("negotiated",r.negotiated);x.addProperty("dir",r.buy?"buy":"sell");x.addProperty("seconds",Math.max(0,(r.expires-p.server.overworld().getGameTime())/20));rows.add(x);}
         o.add("requests",rows);SunlitMarketMod.CHANNEL.send(PacketDistributor.PLAYER.with(()->p),new CounterStateMessage(containerId,o.toString()));
     }
 }

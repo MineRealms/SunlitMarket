@@ -30,14 +30,16 @@ public final class CounterScreen extends AbstractContainerScreen<CounterMenu>{
         actions.forEach(this::removeWidget);actions.clear();
         offset=Math.min(offset,Math.max(0,rows().size()-3));
         for(int i=0;i<Math.min(3,rows().size()-offset);i++){
-            JsonObject r=rows().get(i+offset).getAsJsonObject();int y=topPos+40+i*27;
-            addAction("收购",leftPos+152,y,36,r,0);
-            if(!r.get("negotiated").getAsBoolean()){addAction("-10%",leftPos+190,y,38,r,2);addAction("-20%",leftPos+230,y,38,r,3);}
+            JsonObject r=rows().get(i+offset).getAsJsonObject();int y=topPos+40+i*27;boolean buy=buying(r);
+            addAction(buy?"出售":"收购",leftPos+152,y,36,r,0);
+            if(!r.get("negotiated").getAsBoolean()){addAction(buy?"+10%":"-10%",leftPos+190,y,38,r,2);addAction(buy?"+20%":"-20%",leftPos+230,y,38,r,3);}
             addAction("拒绝",leftPos+270,y,36,r,1);
         }
         if(offset>0)addNav("<",leftPos+260,-3);
         if(offset+3<rows().size())addNav(">",leftPos+284,3);
     }
+    /** Older servers send no "dir"; those requests are always NPC sales. */
+    private static boolean buying(JsonObject r){return r.has("dir")&&r.get("dir").getAsString().equals("buy");}
     private void addNav(String text,int x,int delta){Button b=Button.builder(Component.literal(text),btn->{offset+=delta;buttons();}).bounds(x,topPos+7,20,18).build();actions.add(addRenderableWidget(b));}
     private void addAction(String text,int x,int y,int width,JsonObject request,int action){
         Button b=Button.builder(Component.literal(text),btn->{
@@ -52,11 +54,12 @@ public final class CounterScreen extends AbstractContainerScreen<CounterMenu>{
     }
     @Override protected void renderLabels(GuiGraphics g,int mouseX,int mouseY){
         g.drawString(font,title,8,8,0xFFD37F,false);
-        g.drawString(font,"NPC 求售 · 基准 / 市场 / 开价",8,28,0xCCCCCC,false);
+        g.drawString(font,"NPC 求售/求购 · 基准 / 市场 / 价格",8,28,0xCCCCCC,false);
         for(int i=0;i<Math.min(3,rows().size()-offset);i++){
             JsonObject r=rows().get(i+offset).getAsJsonObject();int y=40+i*27;
             String item=r.get("item").getAsString();
-            g.drawString(font,font.plainSubstrByWidth(item+" x"+r.get("count").getAsInt(),140),8,y,0xFFFFFF,false);
+            String tag=buying(r)?"[求购] ":"[求售] ";
+            g.drawString(font,font.plainSubstrByWidth(tag+item+" x"+r.get("count").getAsInt(),140),8,y,buying(r)?0x9FE0A0:0xFFFFFF,false);
             String prices=r.get("base")+" / "+r.get("market")+" / "+r.get("ask")+"  "+r.get("seconds")+"s";
             g.drawString(font,prices,8,y+11,0xFFD37F,false);
         }

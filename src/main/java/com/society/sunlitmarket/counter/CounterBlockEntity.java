@@ -8,6 +8,8 @@ import com.society.sunlitmarket.core.MarketRules;
 import com.society.sunlitmarket.core.TradeMath;
 import com.society.sunlitmarket.currency.Currency;
 import com.society.sunlitmarket.crime.CrimeService;
+import com.society.sunlitmarket.treasury.Treasury;
+import com.society.sunlitmarket.treasury.TreasuryData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
@@ -56,8 +58,11 @@ public final class CounterBlockEntity extends BlockEntity implements net.minecra
             var identity=MarketRules.identity(npc);if(!identity.customer())continue;
             var pools=MarketRules.pools(identity.faction());if(pools.isEmpty())continue;
             var pool=pools.get(sl.random.nextInt(pools.size()));
+            boolean buy=pool.buys()&&(!pool.sells()||sl.random.nextBoolean());
+            // A buying NPC only shows up while today's NPC budget could still pay its bid.
+            if(buy&&Treasury.enabled()&&Treasury.data(sl.getServer()).npcRemaining(Treasury.policy())<pool.bidPrice())continue;
             CustomerRequest request;
-            try { request=CustomerRequest.create(npc.getUUID(),identity.faction(),pool,now+CoreConfig.REQUEST_LIFETIME.get()); }
+            try { request=CustomerRequest.create(npc.getUUID(),identity.faction(),pool,now+CoreConfig.REQUEST_LIFETIME.get(),buy); }
             catch(IllegalArgumentException ex) { continue; }
             if(request.goods.isEmpty())continue;
             var hook=com.society.sunlitmarket.core.MarketHooks.fire(new com.society.sunlitmarket.core.MarketHooks.Event(
@@ -85,6 +90,7 @@ public final class CounterBlockEntity extends BlockEntity implements net.minecra
         int alignment=AlignmentData.get(p.server).get(p,r.faction);
         if(alignment<CoreConfig.REFUSE_BELOW.get())return "该派系拒绝交易";
         if(action==1) {requests.remove(r);setChanged();return "已拒绝";}
+        if(r.buy)return sellToNpc(p,r,action,alignment);
         if(action==2||action==3) {
             if(r.negotiated)return "本请求已经还价";
             r.negotiated=true;int percent=action==2?90:80;
@@ -105,7 +111,7 @@ public final class CounterBlockEntity extends BlockEntity implements net.minecra
         String result=Currency.settle(p,null,this,goods,goods.getCount(),-r.ask,"COUNTER_PURCHASE");
         if(!result.isEmpty())return result;
         // Money paid to an NPC leaves player circulation and returns to the issuance reserve.
-        com.society.sunlitmarket.treasury.Treasury.receive(p.server,com.society.sunlitmarket.treasury.TreasuryData.Account.RESERVE,r.ask,"COUNTER_PURCHASE");
+        Treasury.receive(p.server,TreasuryData.Account.RESERVE,r.ask,"COUNTER_PURCHASE");
         requests.remove(r);setChanged();
         if(r.heat>0) {AlignmentData.get(p.server).addWanted(p,Math.max(0,r.wanted));AlignmentData.get(p.server).add(p,r.faction,-CoreConfig.STOLEN_ALIGNMENT_LOSS.get());}
         else if((long)r.ask*100>= (long)r.market*90) AlignmentData.get(p.server).add(p,r.faction,
@@ -116,6 +122,39 @@ public final class CounterBlockEntity extends BlockEntity implements net.minecra
         com.society.sunlitmarket.core.MarketHooks.fire(new com.society.sunlitmarket.core.MarketHooks.Event(
                 "afterTrade",p,npc,r.faction,r.id.toString(),goods,r.ask));
         return "收购完成，货物已入柜台";
+    }
+    /**
+     * An NPC buying from the counter: 0 sells, 2/3 asks 10%/20% more. Payment comes from the NPC
+     * daily budget in the issuance reserve; the goods leave the counter and are consumed.
+     */
+    private String sellToNpc(ServerPlayer p,CustomerRequest r,int action,int alignment) {
+        if(action==2||action==3) {
+            if(r.negotiated)return "本请求已经议价";
+            r.negotiated=true;int percent=action==2?110:120;
+            int proposal=(int)Math.min(10000000L,Math.max(r.ask+1L,(long)r.ask*percent/100));
+            double chance=Math.max(.1,Math.min(.9,CoreConfig.HAGGLE_CHANCE.get()+alignment/1000D-(proposal-r.market)/(double)r.market));
+            if(level.random.nextDouble()<chance) {r.ask=proposal;setChanged();return "顾客接受加价，请确认出售";}
+            requests.remove(r);AlignmentData.get(p.server).add(p,r.faction,-CoreConfig.HAGGLE_FAILURE_LOSS.get());setChanged();return "加价失败，顾客离开";
+        }
+        if(action!=0)return "无效操作";
+        ItemStack goods=r.goods.copy();
+        var npc=((ServerLevel)level).getEntity(r.npc);
+        var hook=com.society.sunlitmarket.core.MarketHooks.fire(new com.society.sunlitmarket.core.MarketHooks.Event(
+                "beforeTrade",p,npc,r.faction,r.id.toString(),goods,r.ask));
+        if(hook.cancelled)return "出售被脚本取消";
+        if(hook.price<1||hook.price>10000000)return "脚本报价无效";
+        if(hook.price!=r.ask){r.ask=hook.price;setChanged();return "报价已更新，请重新确认";}
+        int price=r.ask;
+        String result=Treasury.payout(p,TreasuryData.Account.RESERVE,true,price,"NPC_DEMAND",
+                ()->Currency.settle(p,this,null,goods,goods.getCount(),price,"NPC_DEMAND"));
+        if(!result.isEmpty())return result;
+        requests.remove(r);setChanged();
+        if((long)price*100<=(long)r.market*110) AlignmentData.get(p.server).add(p,r.faction,
+                TradeMath.clamp((long)Math.max(0,r.reward)*Math.max(1,TradeMath.amount(((long)Math.min(price,r.market)+CoreConfig.FAIR_REWARD_DIVISOR.get()-1)/CoreConfig.FAIR_REWARD_DIVISOR.get())),0,100));
+        else if((long)price*100>(long)r.market*140)AlignmentData.get(p.server).add(p,r.faction,-Math.max(1,(price-r.market)/100));
+        com.society.sunlitmarket.core.MarketHooks.fire(new com.society.sunlitmarket.core.MarketHooks.Event(
+                "afterTrade",p,npc,r.faction,r.id.toString(),goods,price));
+        return "出售完成，顾客带走了货物";
     }
     @Override public Component getDisplayName(){return Component.translatable("block.sunlitmarket.counter");}
     @Override public AbstractContainerMenu createMenu(int id,Inventory inventory,Player p){return access(p)?new CounterMenu(id,inventory,this):null;}
