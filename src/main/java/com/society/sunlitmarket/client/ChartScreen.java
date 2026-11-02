@@ -180,25 +180,27 @@ public final class ChartScreen extends Screen {
             g.drawString(font, text, plotX1 + 6, y - 4, Ui.TEXT_FAINT, false);
         }
         Ui.hline(g, plotX0, plotY0, plotW, 0x18FFFFFF);
-        Ui.vline(g, plotX1, plotY0, plotH, 0x18FFFFFF);
 
         int n = candles.size();
-        int step = Math.max(3, plotW / n);
+        int slots = Math.max(n, 24);
+        int step = Math.max(3, plotW / slots);
+        int shown = Math.min(n, Math.max(1, plotW / step));
+        int first = n - shown;
+        int startX = plotX0;
         int bodyW = Math.max(1, Math.min(11, step - 2));
-        int startX = plotX0 + Math.max(0, (plotW - n * step) / 2);
 
         int hover = -1;
-        int lastCloseY = 0;
+        int lastCloseY = plotY0 + plotH / 2;
         int lastColor = Ui.TEXT_DIM;
-        for (int i = 0; i < n; i++) {
-            int[] c = candles.get(i);
+        for (int i = 0; i < shown; i++) {
+            int[] c = candles.get(first + i);
             int slot = startX + i * step;
             int center = slot + step / 2;
             int bx = center - bodyW / 2;
-            int open = yFor(c[1], min, max, plotH);
-            int high = yFor(c[2], min, max, plotH);
-            int low = yFor(c[3], min, max, plotH);
-            int close = yFor(c[4], min, max, plotH);
+            int open = yFor(c[1], min, max, plotY0, plotH);
+            int high = yFor(c[2], min, max, plotY0, plotH);
+            int low = yFor(c[3], min, max, plotY0, plotH);
+            int close = yFor(c[4], min, max, plotY0, plotH);
             int color = c[4] >= c[1] ? Ui.UP : Ui.DOWN;
 
             Ui.rect(g, center, high, 1, Math.max(1, low - high + 1), color);
@@ -207,7 +209,7 @@ public final class ChartScreen extends Screen {
             lastCloseY = close;
             lastColor = color;
             if (mouseX >= slot && mouseX < slot + step && mouseY >= plotY0 && mouseY <= plotY1) {
-                hover = i;
+                hover = first + i;
             }
         }
 
@@ -220,7 +222,7 @@ public final class ChartScreen extends Screen {
 
         if (hover >= 0) {
             int[] c = candles.get(hover);
-            int slot = startX + hover * step;
+            int slot = startX + (hover - first) * step;
             Ui.vline(g, slot + step / 2, plotY0, plotH, 0x66FFFFFF);
             drawHover(g, c, mouseX, mouseY);
         }
@@ -291,9 +293,11 @@ public final class ChartScreen extends Screen {
         }
     }
 
-    private static int yFor(int value, int min, int max, int plotH) {
-        if (max <= min) return 0;
-        return plotH - (int) Math.round((value - min) * (double) plotH / (max - min));
+    /** Maps a price to an absolute screen y inside the plot (top of the plot = highest price). */
+    private static int yFor(int value, int min, int max, int plotY0, int plotH) {
+        if (max <= min) return plotY0 + plotH / 2;
+        int offset = (int) Math.round((value - min) * (double) plotH / (max - min));
+        return plotY0 + plotH - Math.max(0, Math.min(plotH, offset));
     }
 
     // ---------------------------------------------------------------- input
