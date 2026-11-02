@@ -87,7 +87,7 @@ public final class MarketScreen extends Screen {
         listBottom = top + panelH - 30;
         searchX = left + 10;
         searchY = top + 42;
-        searchW = panelW - 132;
+        searchW = panelW - 176;
         trackX = left + panelW - 15;
     }
 
@@ -242,7 +242,7 @@ public final class MarketScreen extends Screen {
         drawScrollbar(graphics, rows);
 
         if (!error.isEmpty()) {
-            graphics.drawString(font, font.plainSubstrByWidth(error, panelW - 24), left + 10, top + panelH - 40, 0xFF5555, false);
+            graphics.drawString(font, font.plainSubstrByWidth(error, panelW / 2 - 48), left + 10, top + panelH - 19, 0xFF5555, false);
         }
         if (hoverRow >= 0) {
             int position = offset + hoverRow;

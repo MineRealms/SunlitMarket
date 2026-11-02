@@ -40,6 +40,18 @@ FTB Teams is optional. Shared party teams use a typed `team:<uuid>` owner even w
 
 `MarketData` (saved data `sunlitmarket_market`) keeps index membership and OHLC candle rings (1-day and 4-hour, 240 candles each). KubeJS registers members bound to merchant shelves: `SunlitMarket.index(id, name, [[merchantId, item], ...])`. The index is the geometric mean of member ratios (current mid / static script base), where the mid is the offer buy price times price modifiers times the E1 shelf-scarcity factor - so trading with the shelves is what moves the index. `/sunlitmarket index` prints live values. Sampling runs every 100 server ticks; missed buckets after downtime are backfilled flat at the last close. Candle rings persist in the same saved data; membership is replaced on every script reload.
 
+## Chart panel
+
+The 行情 button in the shop window sends `ChartRequestMessage` (C2S, read-only, no trade session needed); the server answers with a serialised `ChartView` through `ChartDataMessage`. Index and period tabs re-request rather than filter locally, so the client never holds a second copy of the pricing rules. `/sunlitmarket chart [index] [period]` opens the same panel from the console. Closing the chart returns to the shop instead of the world.
+
+Candles are drawn with `GuiGraphics.fill` (no chart library); the y axis auto-scales to the visible high/low with 5% padding, and hovering shows that bucket's open/high/low/close. Colour convention is 红涨绿跌 (red up, green down). A period is 24000 ticks (one in-game day) or 4000 ticks (four in-game hours), matching `MarketData.PERIODS`.
+
+## Shop window
+
+`MarketScreen` is a fixed-size framed window: search box (filters by item id and localised name, `Ctrl+F` focuses it), scrollbar (wheel, track click, thumb drag) and item tooltips. The status line under each item shows stock, daily limit, reputation requirement, unlock state and the shelf premium - the difference between the current quote and the same quote without the E1 scarcity factor, which is what `baseBuy`/`baseSell` in `MarketView` carry.
+
+Client/server split: every class under `client/` may touch `net.minecraft.client.*`; nothing outside it may. S2C handlers reach the GUI only through `client/ClientPacketHandlers`, and the built jar is scanned to keep it that way (a dedicated server previously died with `NoClassDefFoundError: net/minecraft/client/gui/screens/Screen`).
+
 ## Trading counter
 
 Craft `sunlitmarket:counter` using wooden slabs and planks, or obtain it with a development command. Its nine inventory slots are shared only with the owning player/team. Hoppers have no exposed sided slots.

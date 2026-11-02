@@ -275,3 +275,14 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 服务端 Rosetta 只读诊断：`me:shire.peasant` 共 33 个，`MarketRegistry.resolve` 全部返回 `me_shire_farmer`；说明 NPC 类型和商人注册正常。右键无反应的原因是 `EntityInteract` 可能先被其它模组取消，监听器现已改为 `EventPriority.LOWEST, receiveCancelled=true`。
 
 专用服务端曾崩溃于 `NoClassDefFoundError: net/minecraft/client/gui/screens/Screen`：`AlignmentMessage` 在 common setup 类加载时直接引用客户端 `Minecraft`/`AlignmentScreen`。现已新增 `client/ClientPacketHandlers`，四个 S2C 包只引用该客户端处理器；扫描 jar 后确认 `net/minecraft/client` 只出现在 `client` 包。服务端 jar sha256 前缀 `346db8b5`，待服务器重启验收。
+
+## 12. E3 行情面板 + 当铺 GUI（2026-11-02，静态 + 单测级）
+
+- 服务端：`ChartView` / `ChartService`（`market` 包，不引用任何客户端类）把指数列表、当前值、`lastBucket` 和最多 120 根蜡烛序列化成 JSON；`ChartRequestMessage`(C2S, id 6) / `ChartDataMessage`(S2C, id 7) 注册在 common setup。请求是只读的，不需要交易会话。
+- 客户端：`client/ChartScreen` 自绘蜡烛（`GuiGraphics.fill`，无第三方图表库），y 轴按可见最高/最低自动缩放并留 5% 边距，悬停十字线显示该 bucket 的开/高/低/收；指数页签和 1日/4时 页签都是重新请求而不是本地过滤，保证客户端不持有第二份定价逻辑。关闭面板回到商店而不是掉回世界。
+- 入口：商店窗口的「行情」按钮（无需权限）；`/sunlitmarket chart [index] [period]` 供管理员从控制台打开。
+- GUI：`MarketScreen` 改为固定尺寸窗框（深空当铺 UI 九宫格贴图），搜索框按物品 ID 和本地化名过滤（`Ctrl+F` 聚焦），翻页按钮换成滚动条（滚轮 / 点击轨道 / 拖动滑块），物品悬停显示 tooltip，状态行新增「货架溢价 ±N%」（`baseBuy`/`baseSell` = 不含 E1 稀缺系数的同一条报价）。
+- 客户端/服务端隔离：S2C 一律经 `client/ClientPacketHandlers`；构建后扫描 jar，`net/minecraft/client` 只出现在 `client` 包（70 个非 client 类，0 泄漏）。
+- `gradle --no-daemon test build` 通过：**48 个单测全过**（新增 ChartViewTest 4）。jar sha256 前缀 `661d2b8d`，已同步主客户端 / -DEV / mirror / server-pack 暂存目录。
+- 未做游戏内验证。观察点：点「行情」后出现 3 个指数页签、蜡烛随交易变化、切 4时 不卡；搜索框输入中文/英文都能过滤；滚动条可拖动且松手后按钮仍可点。
+- 已知限制：蜡烛要在服务器跑满一个 bucket 才会出现第二根，第一天只有一根会显示为一条横线——这是数据量问题，不是渲染问题。
