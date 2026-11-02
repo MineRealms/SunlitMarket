@@ -328,5 +328,6 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - 实测：初始 `budget=20000`（世界 100000 与每人 20000 取小）；`setBuyback(100,100)` 后 `collect` 被整笔拒绝 → `今日额度只剩 100，本次需 999；明日再来`，钱包 591 不变、仓内仍剩 999；`setBuyback(2000,2000)` 后同一笔成功 → 钱包 1590、仓清零、剩余额度 1001；恢复默认后 `budget=19001`（今天已花 999）。
 - 整笔拒绝而不是按剩余额度部分支付：部分支付要么销毁货物，要么留下半格残料，而玩家明天再来就行。界面在「合计」右侧显示 `今日剩 N`，额度不够时按钮置灰。
 - 存档往返实测（反射调 `save`/`load`）：`{Day:40L, Players:{<uuid>:999L}, Spent:999L}` → 重新 load 后 `remaining=19001`（与在线实例一致），`today+1` 时 `remaining=20000`（跨日归零）。
-- 注意：`/save-all` 需要权限 4，单人 op（2 级）跑不了，控制台桥也跑不了，所以没能在会话内看到 `.dat` 落盘；写入路径与 `MarketData` 完全相同（`DimensionDataStorage.computeIfAbsent`），后者已在多次重启中验证。
+- 落盘实测：正常退出客户端后 `saves/asverify/data/sunlitmarket_buyback.dat` 生成（121 B）；重启后 `budget=19001`（= 20000 上限 − 上一局已花 999），证明当日累计跨重启保留。`/save-all` 要权限 4，单人 op（2 级）和控制台桥都跑不了，验证靠正常退出。
 - 未验证：跨日真实滚动（需要 `time add 24000` 且预算已花掉），只验证了 `load` 后 `today+1` 的逻辑分支。
+- 重启后再测一遍额度：`budget=19001` → 上限 100 时 `budget=0`、拒绝并提示「今日回收额度已用尽」；上限 2000 时 `budget=1001` → 成交 +999、剩 2；恢复默认后 18002。
