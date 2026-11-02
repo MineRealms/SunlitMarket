@@ -196,9 +196,43 @@ public final class SunlitMarketMod {
                                 })));
     }
 
+    /**
+     * Opens the market of the closest resolved merchant, so a player (or an operator
+     * testing a packed counter) does not have to aim at a specific NPC.
+     */
+    private static int openNearest(net.minecraft.commands.CommandSourceStack source, int radius)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+        java.util.List<net.minecraft.world.entity.Entity> candidates = player.level().getEntitiesOfClass(
+                net.minecraft.world.entity.Entity.class, player.getBoundingBox().inflate(radius),
+                entity -> !(entity instanceof ServerPlayer) && MarketRegistry.resolve(entity) != null);
+        net.minecraft.world.entity.Entity nearest = null;
+        double nearestDistance = Double.MAX_VALUE;
+        for (net.minecraft.world.entity.Entity entity : candidates) {
+            double distance = entity.distanceToSqr(player);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearest = entity;
+            }
+        }
+        Merchant merchant = nearest == null ? null : MarketRegistry.resolve(nearest);
+        if (merchant == null) {
+            source.sendFailure(Component.literal("No merchant within " + radius + " blocks"));
+            return 0;
+        }
+        MarketService.open(player, merchant, nearest);
+        String distance = String.format(java.util.Locale.ROOT, "%.1f", Math.sqrt(nearestDistance));
+        source.sendSuccess(() -> Component.literal("Opening " + merchant.name + " (" + merchant.id + ") at " + distance + "m"), false);
+        return 1;
+    }
+
     private void onCommands(RegisterCommandsEvent event) {
         event.getDispatcher().register(Commands.literal("sunlitmarket")
                 .requires(source -> source.hasPermission(2))
+                .then(Commands.literal("near")
+                        .executes(ctx -> openNearest(ctx.getSource(), 12))
+                        .then(Commands.argument("radius", IntegerArgumentType.integer(1, 64))
+                                .executes(ctx -> openNearest(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "radius")))))
                 .then(Commands.literal("open")
                         .then(Commands.argument("merchant", StringArgumentType.string())
                                 .executes(ctx -> {
