@@ -33,6 +33,7 @@ public final class WalletExchange {
         if (!Currency.payCash(player, available)) return "扣款失败，货币未变动";
         long credited = afterFee(available);
         Wallet.add(player, credited);
+        try { com.society.sunlitmarket.audit.EconomyAudit.observeSettlement(((net.minecraft.server.level.ServerPlayer) player).server, "WALLET_EXCHANGE_IN", "WALLET", "CONFIRMED", credited, player.getUUID(), "cash debit is observed by PAY_CASH; fee sink=" + (available - credited)); } catch (Throwable ignored) {}
         return "存入 " + available + " → 钱包 +" + credited + "（手续费 " + fee() + "%）";
     }
 
@@ -48,6 +49,7 @@ public final class WalletExchange {
             Wallet.add(player, amount);
             return "背包放不下 " + paid + " spur，已退回钱包";
         }
+        try { com.society.sunlitmarket.audit.EconomyAudit.observeSettlement(((net.minecraft.server.level.ServerPlayer) player).server, "WALLET_EXCHANGE_OUT", "WALLET", "CONFIRMED", -amount, player.getUUID(), "cash credit is observed by GIVE; fee sink=" + (amount - paid)); } catch (Throwable ignored) {}
         return "钱包 −" + amount + " → 取出 " + paid + "（手续费 " + fee() + "%）";
     }
 

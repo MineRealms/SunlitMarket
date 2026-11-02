@@ -38,6 +38,11 @@ public final class CoreCommands {
                 var p=c.getSource().getPlayerOrException();var hit=p.pick(6,0,false);
                 if(hit instanceof net.minecraft.world.phys.BlockHitResult b&&p.level().getBlockEntity(b.getBlockPos()) instanceof CounterBlockEntity be){be.transfer(p);c.getSource().sendSuccess(()->Component.literal("Counter ownership recovered"),true);return 1;}return 0;
             }))
+            .then(Commands.literal("audit").then(Commands.literal("status").executes(c->{
+                var s=c.getSource().getServer();c.getSource().sendSuccess(()->Component.literal(com.society.sunlitmarket.audit.EconomyAudit.status(s)),false);return 1;
+            })).then(Commands.literal("gaps").executes(c->{
+                c.getSource().sendSuccess(()->Component.literal("scope=SUNLITMARKET_SETTLEMENTS_ONLY; external bank/coin creators, direct item exchange, C/R/NPC budgets and unhooked wallet mutations are UNKNOWN or outside coverage"),false);return 1;
+            })))
             .then(Commands.literal("selftest").executes(c->{
                 ServerPlayer p=c.getSource().getPlayerOrException();
                 if(!p.server.isSingleplayer()&&!Boolean.getBoolean("sunlitmarket.allowSelfTest")){c.getSource().sendFailure(Component.literal("Self-test is restricted to isolated development worlds"));return 0;}

@@ -409,7 +409,9 @@ public final class SunlitMarketBinding {
     /** Credits the wallet directly; use for quest rewards that should not become coins. */
     public boolean walletAdd(Player player, long amount) {
         try {
-            return com.society.sunlitmarket.wallet.Wallet.add(player, amount);
+            boolean ok = com.society.sunlitmarket.wallet.Wallet.add(player, amount);
+            if (ok && player instanceof ServerPlayer serverPlayer) try { com.society.sunlitmarket.audit.EconomyAudit.observeSettlement(serverPlayer.server, "KJS_WALLET_ADD", "WALLET", "CONFIRMED", amount, player.getUUID(), "direct script adjustment"); } catch (Throwable ignored) {}
+            return ok;
         } catch (Throwable t) {
             SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.walletAdd failed", t);
         }
@@ -419,7 +421,9 @@ public final class SunlitMarketBinding {
     /** Debits the wallet; false and no change when the balance is short. */
     public boolean walletTake(Player player, long amount) {
         try {
-            return com.society.sunlitmarket.wallet.Wallet.take(player, amount);
+            boolean ok = com.society.sunlitmarket.wallet.Wallet.take(player, amount);
+            if (ok && player instanceof ServerPlayer serverPlayer) try { com.society.sunlitmarket.audit.EconomyAudit.observeSettlement(serverPlayer.server, "KJS_WALLET_TAKE", "WALLET", "CONFIRMED", -amount, player.getUUID(), "direct script adjustment"); } catch (Throwable ignored) {}
+            return ok;
         } catch (Throwable t) {
             SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.walletTake failed", t);
         }

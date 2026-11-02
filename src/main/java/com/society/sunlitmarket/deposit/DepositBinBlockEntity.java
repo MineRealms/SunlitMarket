@@ -151,6 +151,7 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
         }
         if (com.society.sunlitmarket.wallet.Wallet.enabled()) {
             com.society.sunlitmarket.wallet.Wallet.add(player, total);
+            try { com.society.sunlitmarket.audit.EconomyAudit.observeSettlement(player.server, "DEPOSIT_BIN_PAYOUT", "WALLET", "CONFIRMED", total, player.getUUID(), "direct wallet payout; valuation estimate"); } catch (Throwable ignored) {}
             drain();
             if (ledger != null) ledger.record(player, today, total);
             lastPayout = total;

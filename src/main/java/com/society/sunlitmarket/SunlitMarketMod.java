@@ -118,6 +118,7 @@ public final class SunlitMarketMod {
         com.society.sunlitmarket.core.MarketRules.loadJson();
         com.society.sunlitmarket.deposit.DepositConfig.load();
         FactionRelations.reload(event.getServer());
+        com.society.sunlitmarket.audit.EconomyAudit.start(event.getServer());
         lastAlignmentDay = Long.MIN_VALUE;
         com.society.sunlitmarket.market.TradeSessions.clear();
     }

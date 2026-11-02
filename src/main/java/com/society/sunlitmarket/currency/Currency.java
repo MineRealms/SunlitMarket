@@ -139,7 +139,27 @@ public final class Currency {
     }
     /** Positive moneyDelta pays the player. null source/target represents virtual stock. */
     public static String settle(Player player, Container source, Container target, ItemStack item, int count, int moneyDelta) {
-        return settle(player, source, target, item, count, moneyDelta, true);
+        return observedSettle(player, source, target, item, count, moneyDelta, true, "SETTLE");
+    }
+
+    private static String observedSettle(Player player, Container source, Container target, ItemStack item, int count, int moneyDelta, boolean useWallet, String reason) {
+        String result;
+        try {
+            result = settleInternal(player, source, target, item, count, moneyDelta, useWallet);
+        } catch (RuntimeException ex) {
+            try { com.society.sunlitmarket.audit.EconomyAudit.observeSettlement(((net.minecraft.server.level.ServerPlayer) player).server, reason, "UNKNOWN", "EXCEPTION", moneyDelta, player.getUUID(), "runtime exception"); } catch (Throwable ignored) {}
+            throw ex;
+        }
+        try {
+            // Do not read the bank a second time merely for telemetry. A debit may have
+            // selected the wallet or the cash/bank backend; the observer records that ambiguity.
+            String backend = useWallet && moneyDelta < 0 && com.society.sunlitmarket.wallet.Wallet.enabled()
+                    ? "WALLET_OR_CASH" : "CASH_OR_BANK";
+            String outcome = result.isEmpty() ? "CONFIRMED" : (result.contains("不明") ? "UNKNOWN" : "FAILED");
+            com.society.sunlitmarket.audit.EconomyAudit.observeSettlement(((net.minecraft.server.level.ServerPlayer) player).server, reason, backend, outcome,
+                    moneyDelta, player.getUUID(), result.isEmpty() ? null : "settlement rejected");
+        } catch (Throwable ignored) {}
+        return result;
     }
 
     /**
@@ -147,7 +167,7 @@ public final class Currency {
      *                  cash-to-wallet conversion needs: otherwise the wallet would pay for its own
      *                  top-up and the fee would be pure burn.
      */
-    private static String settle(Player player, Container source, Container target, ItemStack item,
+    private static String settleInternal(Player player, Container source, Container target, ItemStack item,
                                  int count, int moneyDelta, boolean useWallet) {
         if (player.level().isClientSide) return "Server-only transaction";
         if (count < 0 || (count > 0 && item.isEmpty())) return "Invalid goods";
@@ -201,15 +221,15 @@ public final class Currency {
         }
     }
     public static boolean pay(Player player, int amount) {
-        return amount >= 0 && settle(player, null, null, ItemStack.EMPTY, 0, -amount).isEmpty();
+        return amount >= 0 && observedSettle(player, null, null, ItemStack.EMPTY, 0, -amount, true, "PAY").isEmpty();
     }
 
     /** Debits coins/bank only, never the virtual wallet. */
     public static boolean payCash(Player player, int amount) {
-        return amount >= 0 && settle(player, null, null, ItemStack.EMPTY, 0, -amount, false).isEmpty();
+        return amount >= 0 && observedSettle(player, null, null, ItemStack.EMPTY, 0, -amount, false, "PAY_CASH").isEmpty();
     }
     public static void give(Player player, int amount) {
-        if (amount < 0 || !settle(player, null, null, ItemStack.EMPTY, 0, amount).isEmpty())
+        if (amount < 0 || !observedSettle(player, null, null, ItemStack.EMPTY, 0, amount, true, "GIVE").isEmpty())
             throw new IllegalStateException("Payment could not be completed");
     }
     public static ItemStack item(String id) {
