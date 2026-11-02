@@ -130,14 +130,56 @@ svCustomers.js 不依赖自定义名称/语言，按实体类型 + 职业识别�
 
 货池：
 
-- **农户**：所有 global.crops 中 value 4–128 的散装作物；排除 crate/bag/block/sack/basket/barrel/box/tray，避免一次请求搬空仓库。
-- **渔夫**：global.fish 中 value 16–80 的鱼。
+- **农户**：所有 global.crops 中 value 4–512 的散装作物；排除 _crate/_bag/_block/_sack/_basket/_barrel/_box/_tray，避免一次请求搬空仓库。
+- **渔夫**：global.fish 中所有非 _barrel 的鱼，包括高价值鱼。
+- **矿物/宝石**：global.ore、global.gems、geode/frozen/magma geode、miscGeologist 全量货池；低价值进铁匠，高价值进旅行商人。
+- **饮料**：global.wines/brews/cocktails/herbalBrews；普通进集市，高价值收藏酒进旅行商人。
+- **文物**：global.artifacts/relics 只进旅行商人，不在普通农户池。
 - **木匠**：global.logs 中 value 2–16 的原木，单次 16 个。
 - **牧羊人**：奶、蛋、羊毛、牛猪羊、火腿、羊奶酪。
 - **铁匠**：铁/铜/金/煤/红石/青金石/锌/铅/银原矿与锭。
 - **集市**：蛋黄酱、帆布、油、枫糖浆、熟成奶酪、电池、松露油、葡萄酒、烤鸡。
 - **图书管理员**：纸、书、书架、命名牌、星之书。
-- **旅行商人**：晶石、紫水晶、海蓝宝石、红宝石、玉、尖晶石、棱彩碎片；其中赃物条目带 heat/wanted。
+- **旅行商人**：晶石、紫水晶、海蓝宝石、红宝石、玉、尖晶石、棱彩碎片、文物，以及 AS/TC/BOT 魔法材料；其中赃物条目带 heat/wanted。
+
+## 4b. AS / TC / BOT 魔法材料
+
+只选材料，不选机器。
+
+**Astral Sorcery**（无 Shipping 锚，按现有星辉商人价格阶梯 + 配方深度）
+
+| 物品 | 数量 | 市场参考 | 顾客 ask |
+|---|---:|---:|---:|
+| astralsorcery:aquamarine | 2 | 80 | 64 |
+| astralsorcery:starmetal_ingot | 1 | 300 | 234 |
+| astralsorcery:stardust | 4 | 96 | 79 |
+| astralsorcery:infused_wood | 4 | 64 | 54 |
+| astralsorcery:resonating_gem | 1 | 160 | 128 |
+| astralsorcery:illumination_powder | 4 | 48 | 40 |
+
+**Thaumcraft**（无 Shipping 锚，按现有神秘材料商 30/38/160/320 阶梯）
+
+| 物品 | 数量 | 市场参考 | 顾客 ask |
+|---|---:|---:|---:|
+| thaumcraft:amber | 2 | 80 | 66 |
+| thaumcraft:quicksilver | 2 | 100 | 82 |
+| thaumcraft:thaumium_ingot | 1 | 220 | 176 |
+| thaumcraft:void_ingot | 1 | 440 | 343 |
+| thaumcraft:alumentum | 4 | 96 | 81 |
+| thaumcraft:nitor | 4 | 64 | 54 |
+
+**Botania**（有 Shipping 锚，锚价优先）
+
+| 物品 | 数量 | 市场参考 | 顾客 ask |
+|---|---:|---:|---:|
+| botania:livingwood_log | 8 | 128 | 115 |
+| botania:livingrock | 16 | 32 | 28 |
+| botania:manasteel_ingot | 1 | 32 | 28 |
+| botania:mana_pearl | 1 | 96 | 81 |
+| botania:mana_diamond | 1 | 1128 | 880 |
+| botania:white_petal | 8 | 16 | 14 |
+
+AS/TC/BOT 材料由旅行商人求购/求售；机器、多方块、仪式结构不进顾客池。新增 `theme_botania_merchant`（tag `sunlitmarket.theme.botania`），高阶材料使用 `theme.botania.adept` 解锁。
 
 ## 5. Middle-earth 派系货池
 
@@ -180,6 +222,7 @@ svMastery.js 只做“阶段 → SunlitMarket unlock”的镜像，不改 FTBQ�
 - kubejs/server_scripts/sunlitmarket/svCustomers.js — Sunlit 职业顾客、货池、价格公式
 - kubejs/server_scripts/sunlitmarket/svMeCustomers.js — ME 派系顾客货池
 - kubejs/server_scripts/sunlitmarket/svMastery.js — 阶段镜像
+- kubejs/server_scripts/sunlitmarket/svMagicCustomers.js — AS/TC/BOT 材料货池
 - kubejs/server_scripts/sunlitmarket/meMerchants.js — ME 商人价格修复/跨经济收购
 - kubejs/startup_scripts/me/meTrades.js — ME 农产品 Shipping Bin 价格（已有）
 
@@ -191,7 +234,7 @@ mod：
 ## 8. 静态检查记录
 
 - node --check：svCustomers.js、svMeCustomers.js、svMastery.js、meMerchants.js 全部通过。
-- Node 静态执行（完整价格数组）：627 条规则 / 612 个货池 / 15 条 NPC 规则，0 重复、0 个 ask≥market 的坏池；bread 为 22/14。FTBQ 重点章节覆盖：crops 89/89、fishing 75/75、pantry 12/12、minerals 44/44。
+- Node 静态执行（完整价格数组）：650 条规则 / 635 个货池 / 15 条 NPC 规则，0 重复、0 个 ask≥market 的坏池；bread 为 22/14。FTBQ 重点章节覆盖：crops 89/89、fishing 75/75、pantry 12/12、minerals 44/44；AS/TC/BOT 魔法材料 20 条。
 - gradle --no-daemon test build：通过（22 个单测，构建产物可生成）。
 - 未运行游戏；没有验证实体类型/职业名、物品 ID、货池实际生成、界面显示。
 - 服务端首次启动时建议检查 [SV-INTEGRATION] ... registered 日志和 SunlitMarket.factions()。

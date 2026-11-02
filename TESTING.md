@@ -244,10 +244,10 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 
 按用户要求**没有启动游戏/服务器测试**（本地 400+ mod，单人世界不可进入）。已完成：
 
-- `SUNLIT_VALLEY_INTEGRATION.md`：价格锚、三类价格面、职业/派系货池、阶段桥和不受影响的 GT 配方边界。
+- `SUNLIT_VALLEY_INTEGRATION.md`：价格锚、三类价格面、职业/派系货池、AS/TC/BOT 材料、阶段桥和不受影响的 GT 配方边界。
 - `svCustomers.js` / `svMeCustomers.js` / `svMastery.js` / `meMerchants.js`：`node --check` 全通过。
-- Node 静态执行（完整价格数组）：627 条规则 / 612 个货池 / 15 条 NPC 规则；0 重复、0 个 `askPrice >= marketValue`；bread 22/14。
-- FTBQ 重点商品覆盖：crops 89/89、fishing 75/75、pantry 12/12、minerals 44/44；GT/机器/收藏品未作为顾客商品。
+- Node 静态执行（完整价格数组）：650 条规则 / 635 个货池 / 15 条 NPC 规则；0 重复、0 个 `askPrice >= marketValue`；bread 22/14。
+- FTBQ 重点商品覆盖：crops 89/89、fishing 75/75、pantry 12/12、minerals 44/44；AS/TC/BOT 材料 20 条；GT/机器/收藏品未作为顾客商品。
 - `gradle --no-daemon test build` 通过，生成 jar 并同步主客户端 / -DEV / mirror（sha256 前缀 `68b67749`）。
 
 待服务器验收：实际实体职业名、物品 ID、货池生成、柜台 UI、ME 商人收购条目、mastery 阶段同步。
