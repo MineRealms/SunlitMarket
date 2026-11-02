@@ -1,6 +1,7 @@
 package com.society.sunlitmarket;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.society.sunlitmarket.alignment.AlignmentData;
 import com.society.sunlitmarket.alignment.FactionRelations;
@@ -115,6 +116,7 @@ public final class SunlitMarketMod {
             LOG.info("[SunlitMarket] applied {} buffered price indices", indices);
         }
         com.society.sunlitmarket.core.MarketRules.loadJson();
+        com.society.sunlitmarket.deposit.DepositConfig.load();
         FactionRelations.reload(event.getServer());
         lastAlignmentDay = Long.MIN_VALUE;
         com.society.sunlitmarket.market.TradeSessions.clear();
@@ -128,6 +130,11 @@ public final class SunlitMarketMod {
         long dayTime = server.overworld().getDayTime();
         if (dayTime % MarketData.SAMPLE_EVERY == 0) {
             MarketData.get(server).sample(dayTime, server);
+        }
+        // KubeJS can override deposit rates mid-session; persist those edits without blocking.
+        if (dayTime % 200L == 0L && com.society.sunlitmarket.deposit.DepositConfig.dirty()) {
+            com.society.sunlitmarket.deposit.DepositConfig.save();
+            LOG.info("[SunlitMarket] deposit_values.json updated by script");
         }
         long day = dayTime / 24000L;
         if (day == lastAlignmentDay) return;
@@ -325,9 +332,42 @@ public final class SunlitMarketMod {
                     ctx.getSource().sendSuccess(() -> Component.literal("Balance: " + Currency.balance(player)), false);
                     return 1;
                 }))
+                .then(Commands.literal("wallet")
+                        .executes(ctx -> {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            long wallet = com.society.sunlitmarket.wallet.Wallet.balance(player);
+                            int cash = Currency.cashBalance(player);
+                            String cashText = cash < 0 ? "不可用" : cash + " spur";
+                            ctx.getSource().sendSuccess(() -> Component.literal("钱包 " + wallet + " spur · 现金/银行 "
+                                    + cashText + " · 兑换手续费 "
+                                    + com.society.sunlitmarket.wallet.WalletExchange.fee() + "%"), false);
+                            return 1;
+                        })
+                        .then(Commands.literal("deposit").executes(ctx -> {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            String result = com.society.sunlitmarket.wallet.WalletExchange.deposit(player);
+                            ctx.getSource().sendSuccess(() -> Component.literal(result), false);
+                            return 1;
+                        }))
+                        .then(Commands.literal("withdraw")
+                                .executes(ctx -> {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    String result = com.society.sunlitmarket.wallet.WalletExchange.withdrawAll(player);
+                                    ctx.getSource().sendSuccess(() -> Component.literal(result), false);
+                                    return 1;
+                                })
+                                .then(Commands.argument("amount", LongArgumentType.longArg(1))
+                                        .executes(ctx -> {
+                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                            String result = com.society.sunlitmarket.wallet.WalletExchange.withdraw(player,
+                                                    LongArgumentType.getLong(ctx, "amount"));
+                                            ctx.getSource().sendSuccess(() -> Component.literal(result), false);
+                                            return 1;
+                                        }))))
                 .then(Commands.literal("reload").executes(ctx -> {
                     MarketRegistry.loadJson();
                     com.society.sunlitmarket.core.MarketRules.loadJson();
+                    com.society.sunlitmarket.deposit.DepositConfig.load();
                     SunlitMarketConfig.invalidate();
                     FactionRelations.reload(ctx.getSource().getServer());
                     ctx.getSource().sendSuccess(() -> Component.literal("SunlitMarket config reloaded"), false);

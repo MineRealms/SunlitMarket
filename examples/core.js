@@ -20,3 +20,23 @@ SunlitMarketEvents.afterTrade(event => {
 SunlitMarketEvents.beforeInspection(event => {
   // event.cancelTrade() cancels this inspection; it does not erase the wanted record.
 })
+
+// ---- acceptance bin price table -------------------------------------------------
+// Everything the bin pays is configurable; these calls write the same values the
+// GUI-side config file holds, and the change is flushed back to
+// config/sunlitmarket/deposit_values.json on the next save tick.
+SunlitMarket.depositAccept('energy', false)              // no FE intake on this pack
+SunlitMarket.depositPrice('minecraft:iron_ingot', 24)     // explicit spur each; 0 refuses it
+SunlitMarket.depositPrice('minecraft:gold_ingot', 0)      // never buy gold from players
+SunlitMarket.depositFluidRate('gtceu:diesel', 12)         // spur per bucket
+console.info('[market] iron now worth ' + SunlitMarket.depositItemValue('minecraft:iron_ingot'))
+
+// ---- virtual wallet -------------------------------------------------------------
+// A per-player account that survives death and dimension changes. Ordinary trades
+// still pay coins; the bin and these calls credit the wallet directly.
+PlayerEvents.tick(event => {
+  let player = event.player
+  if (player.age % 200 !== 0) return
+  // Quest-style reward that should not become loose coins:
+  if (SunlitMarket.wallet(player) === 0) SunlitMarket.walletAdd(player, 50)
+})

@@ -4,7 +4,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.society.sunlitmarket.deposit.DepositBinMenu;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -27,14 +26,21 @@ public final class DepositBinScreen extends AbstractContainerScreen<DepositBinMe
     private static final int GAP = 6;
     private static final int CLOSE = 9;
     private static final int ROWS = 5;
+    private static final int WALLET_H = 24;
+    private static final int WALLET_BTN_W = 40;
+    private static final int WALLET_BTN_H = 16;
 
     private static final String[] LABELS = {"物品", "流体", "能量", "要素", "魔力"};
 
     private JsonObject state = new JsonObject();
     private int panelW = 340;
-    private int panelH = 190;
+    private int panelH = 198;
     private int left;
     private int top;
+    private int walletY;
+    private int depositX;
+    private int withdrawX;
+    private int walletButtonY;
     private int footerY;
     private int closeX;
     private int closeY;
@@ -58,10 +64,14 @@ public final class DepositBinScreen extends AbstractContainerScreen<DepositBinMe
     protected void init() {
         super.init();
         panelW = Math.min(340, width - 20);
-        panelH = 190;
+        panelH = 198;
         left = (width - panelW) / 2;
         top = (height - panelH) / 2;
-        footerY = top + panelH - GAP - 18;
+        walletY = top + HEADER_H + GAP + ROWS * ROW_H + GAP;
+        walletButtonY = walletY + (WALLET_H - WALLET_BTN_H) / 2;
+        withdrawX = left + panelW - PAD - WALLET_BTN_W;
+        depositX = withdrawX - GAP - WALLET_BTN_W;
+        footerY = walletY + WALLET_H + GAP;
         closeX = left + panelW - PAD - CLOSE;
         closeY = top + (HEADER_H - CLOSE) / 2;
         buttonX = left + panelW - PAD - 64;
@@ -78,6 +88,7 @@ public final class DepositBinScreen extends AbstractContainerScreen<DepositBinMe
         g.fill(0, 0, width, height, Ui.SCRIM);
         drawChrome(g, mouseX, mouseY);
         drawRows(g, mouseX, mouseY);
+        drawWallet(g, mouseX, mouseY);
         drawFooter(g, mouseX, mouseY);
         super.render(g, mouseX, mouseY, partialTick);
     }
@@ -198,12 +209,40 @@ public final class DepositBinScreen extends AbstractContainerScreen<DepositBinMe
         return value > 0 ? value + " spur" : "—";
     }
 
+    /** Wallet band: balance on the left, cash <-> wallet conversion on the right. */
+    private void drawWallet(GuiGraphics g, int mouseX, int mouseY) {
+        boolean enabled = boolOf("walletEnabled");
+        Ui.rect(g, left + 1, walletY, panelW - 2, WALLET_H, Ui.SUNKEN);
+        Ui.hline(g, left + 1, walletY, panelW - 2, Ui.EDGE_SOFT);
+        Ui.hline(g, left + 1, walletY + WALLET_H - 1, panelW - 2, Ui.EDGE_SOFT);
+
+        String balance = enabled
+                ? String.format(Locale.ROOT, "钱包 %,d spur", longOf("wallet"))
+                : "钱包未启用";
+        g.drawString(font, balance, left + 12, walletY + 3, enabled ? Ui.GOLD : Ui.TEXT_FAINT, false);
+
+        String note = enabled
+                ? "兑换手续费 " + intOf("feePercent") + "% · 最低取出 " + intOf("minWithdraw")
+                : "在 deposit_values.json 中开启 wallet.enabled";
+        g.drawString(font, font.plainSubstrByWidth(note, withdrawX - left - 24),
+                left + 12, walletY + 13, Ui.TEXT_FAINT, false);
+
+        boolean hoverDeposit = Ui.hit(mouseX, mouseY, depositX, walletButtonY, WALLET_BTN_W, WALLET_BTN_H);
+        boolean hoverWithdraw = Ui.hit(mouseX, mouseY, withdrawX, walletButtonY, WALLET_BTN_W, WALLET_BTN_H);
+        boolean canWithdraw = enabled && longOf("wallet") >= intOf("minWithdraw");
+        Ui.button(g, font, "存入", depositX, walletButtonY, WALLET_BTN_W, WALLET_BTN_H,
+                hoverDeposit, enabled, Ui.BTN, Ui.BTN_HOVER, Ui.TEXT);
+        Ui.button(g, font, "取出", withdrawX, walletButtonY, WALLET_BTN_W, WALLET_BTN_H,
+                hoverWithdraw, canWithdraw, Ui.BTN, Ui.BTN_HOVER, Ui.TEXT);
+    }
+
     private void drawFooter(GuiGraphics g, int mouseX, int mouseY) {
         int bandY = footerY - GAP / 2;
         Ui.rect(g, left + 1, bandY, panelW - 2, top + panelH - bandY - 1, Ui.PANEL_FOOT);
         Ui.hline(g, left + 1, bandY, panelW - 2, Ui.EDGE_SOFT);
 
-        String message = state.has("message") ? state.get("message").getAsString() : "";
+        String message = state.has("walletMessage") ? state.get("walletMessage").getAsString()
+                : state.has("message") ? state.get("message").getAsString() : "";
         if (!message.isEmpty()) {
             g.drawString(font, font.plainSubstrByWidth(message, panelW - 90), left + 12, footerY + 1, Ui.TEXT_DIM, false);
         }
@@ -224,13 +263,26 @@ public final class DepositBinScreen extends AbstractContainerScreen<DepositBinMe
                 return true;
             }
             if (Ui.hit(mouseX, mouseY, buttonX, buttonY, 64, 18) && intOf("total") > 0) {
-                if (minecraft != null && minecraft.gameMode != null) {
-                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
-                }
+                press(0);
+                return true;
+            }
+            if (boolOf("walletEnabled") && Ui.hit(mouseX, mouseY, depositX, walletButtonY, WALLET_BTN_W, WALLET_BTN_H)) {
+                press(1);
+                return true;
+            }
+            if (boolOf("walletEnabled") && Ui.hit(mouseX, mouseY, withdrawX, walletButtonY, WALLET_BTN_W, WALLET_BTN_H)
+                    && longOf("wallet") >= intOf("minWithdraw")) {
+                press(2);
                 return true;
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private void press(int id) {
+        if (minecraft != null && minecraft.gameMode != null) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
+        }
     }
 
     @Override
@@ -245,6 +297,10 @@ public final class DepositBinScreen extends AbstractContainerScreen<DepositBinMe
 
     private int intOf(String key) {
         return state.has(key) && state.get(key).isJsonPrimitive() ? state.get(key).getAsInt() : 0;
+    }
+
+    private long longOf(String key) {
+        return state.has(key) && state.get(key).isJsonPrimitive() ? state.get(key).getAsLong() : 0L;
     }
 
     private boolean boolOf(String key) {

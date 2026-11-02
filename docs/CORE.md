@@ -11,6 +11,7 @@ This project owns the trading engine and optional ME/FTB adapters. It does not i
 - `trade.dynamicPricing` (default on) makes stocked shelves price by inventory: one scarcity factor `clamp((initial/max(stock,1))^elasticity, min, max)` scales BOTH directions of the same offer. Buying drains the shelf and raises prices; selling refills it (capped at `sellOverstockCapacity` x restock level) and lowers them. Unlimited offers (`stock: -1`) and fixed/coin offers keep fixed prices. Shelf stock still resets at the daily roll, which acts as the mean-reversion step.
 - `config/sunlitmarket/merchants.json`: legacy merchant array or `{ "merchants": [...] }`.
 - `config/sunlitmarket/rules.json`: NPC identities, explicit request pools and contraband laws. See `examples/core-rules.json`.
+- `config/sunlitmarket/deposit_values.json`: the acceptance bin's price table plus the `wallet` block. Written with defaults on first start; see §Acceptance bin and §Virtual wallet.
 - NPC identity rules accept `tag`, `npcType`, `entity` (registry id) and `profession` (villager profession). `entity` + `profession` is intended for pack NPCs such as vanilla villagers; `profession` alone matches any villager with that profession.
 - Data packs: `data/<namespace>/sunlitmarket/factions/*.json`; the optional ME adapter reads `data/me/me/faction/*.json` without importing ME classes.
 
@@ -58,23 +59,35 @@ Client/server split: every class under `client/` may touch `net.minecraft.client
 
 `sunlitmarket:deposit_bin` drains five different industrial outputs into one payout, so a late-game player has somewhere to dump surplus without a per-mod hopper chain.
 
-| Intake | Capability | Capacity | Rate |
+| Intake | Capability | Capacity | Rate source |
 |---|---|---:|---|
-| Item | Forge `IItemHandler` | 1 stack | the pawnshop's own sell table (`Offer.sell / count`), 0 if no merchant buys it |
-| Fluid | Forge `IFluidHandler` | 8 buckets | 1-10 spur per bucket by fluid id, 1 for anything unlisted |
-| FE | Forge `IEnergyStorage` | 2M | 1 spur per 50,000 FE |
-| Essentia | Thaumcraft `EssentiaCapabilities.TRANSPORT` | 128 | 1 spur per point |
-| Mana | Botania `MANA_RECEIVER` | 1M | 1 spur per 2,000 mana |
+| Item | Forge `IItemHandler` | 1 stack | `items` entry in `deposit_values.json`; else the pawnshop's own sell table (`Offer.sell / count`); else 0 |
+| Fluid | Forge `IFluidHandler` | 8 buckets | `fluids` entry per fluid id, `fluids.default` otherwise |
+| FE | Forge `IEnergyStorage` | 2M | `energy.fePerSpur` |
+| Essentia | Thaumcraft `EssentiaCapabilities.TRANSPORT` | 128 | `essentia.pointsPerSpur`, overridden per aspect by `essentia.aspects` |
+| Mana | Botania `MANA_RECEIVER` | 1M | `mana.manaPerSpur` |
+
+No rate is hard-coded. `config/sunlitmarket/deposit_values.json` is written with defaults on first start; `accept` switches a whole channel off (it then values 0 and the screen row greys out), and `items` / `fluids` / `essentia.aspects` carry the per-id table. The file is the price table; KubeJS overrides land on top and are flushed back to it on the next save tick, so a script can stay the single source of truth.
 
 Energy is priced worst on purpose: GT electricity has no production ceiling, so any meaningful rate would be a printing press. GT itself needs no special code - GTCEu machines and converters expose Forge `IEnergyStorage`, so a `gtceu:*_energy_converter` bridges EU into the FE port.
 
-`collect()` prices everything, credits the wallet through `Currency.settle` **first**, and only then clears the intakes. A failed payout therefore never destroys goods.
+`collect()` prices everything, credits the wallet **first**, and only then clears the intakes. A failed payout therefore never destroys goods. With `wallet.enabled` off it falls back to `Currency.settle`, which can still fail on a full inventory and then leaves the bin untouched.
 
 Optional mods are optional at runtime, not just at compile time: the Thaumcraft port compiles against the exact 20748 api jar vendored in `libs/` and is only instantiated behind `ModList.isLoaded("thaumcraft")`; Botania is reached with a dynamic proxy, so there is no 12 MB compile dependency and no class-loading failure on a pack without it.
 
-Client/server split: the block, block entity, menu and valuation live outside `client/`; only `DepositBinScreen` touches `net.minecraft.client.*`. State reaches the screen as `DepositStateMessage` (S2C id 8), and the payout button rides `clickMenuButton(0)` so no C2S packet is needed.
+Client/server split: the block, block entity, menu and valuation live outside `client/`; only `DepositBinScreen` touches `net.minecraft.client.*`. State reaches the screen as `DepositStateMessage` (S2C id 8), and the three buttons ride `clickMenuButton(0..2)` (collect / deposit cash / withdraw all) so no C2S packet is needed.
 
 Known gap: the bin still pays without a daily budget. That is the `BuybackBudgetManager` from `ECONOMY_MODEL_V2.md` §7 and is not implemented yet.
+
+## Virtual wallet
+
+`Wallet` is a per-player spur balance kept in the player's Forge persistent data, so it survives death, dimension changes and reloads without a capability registration pass. It is not a second inventory of coins: it is an account.
+
+- `Currency.balance()` is cash/bank **plus** wallet; `Currency.cashBalance()` is the physical/bank number only. Affordability displays use the former.
+- A debit is paid from the wallet when the wallet covers it whole, otherwise it falls through to coins/bank exactly as before. A payment is never split across two backends, so a half-empty wallet behaves like an absent one.
+- Credits from ordinary trade still go to coins/bank; only the acceptance bin and `Wallet.add` credit the wallet directly.
+- `WalletExchange.deposit()` converts cash into the wallet and `withdraw()` converts back; both charge `wallet.exchangeFeePercent` and the fee is simply never minted, which is what stops the pair from being a free laundering loop. `deposit` debits through `Currency.payCash`, which skips the wallet leg - otherwise the wallet would pay for its own top-up and the fee would be pure burn.
+- GUI: the bin screen's wallet band shows the balance, the fee and 存入/取出. `/sunlitmarket wallet [deposit|withdraw <n>]` does the same without the block.
 
 ## Trading counter
 
@@ -99,6 +112,8 @@ Keep existing `SunlitMarket` methods and legacy reputation aliases. New examples
 - `rule({...})`, `clearRules()` register/clear script rules.
 - `owner(player)`, `identity(entity)`, `regionWeight(entity, faction)` expose adapter results.
 - `heat(stack)`, `markStolen(stack, heat)` manage explicit provenance.
+- `depositPrice(itemId, spur)`, `depositFluidRate(fluidId, perBucket)` and `depositAccept(channel, allowed)` override the acceptance-bin table at runtime; `depositItemValue(itemId)` reads the effective rate and `depositReload()` re-reads the file. Overrides are flushed back to `deposit_values.json` on the next save tick.
+- `wallet(player)`, `walletAdd`, `walletTake`, `walletDeposit(player)` and `walletWithdraw(player, amount)` expose the virtual account.
 - `playerFaction(player)` returns a cached on-disk ME allegiance snapshot or `UNKNOWN`; it is not a live authority and never writes ME SavedData.
 - `SunlitMarketEvents.beforeRequest/afterRequest/beforeTrade/afterTrade/beforeInspection/afterInspection` expose `event.data`.
 - `event.cancelTrade()` cancels a before action. `event.setPrice(n)` changes generated request quotes; changing an existing counter quote requires another player confirmation. Stock price changes should use the pricing API.

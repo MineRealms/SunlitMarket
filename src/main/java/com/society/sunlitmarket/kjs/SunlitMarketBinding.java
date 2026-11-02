@@ -322,6 +322,112 @@ public final class SunlitMarketBinding {
         return Currency.balance(player);
     }
 
+    // ---- acceptance bin price table ---------------------------------------------------
+    // Everything below writes through DepositConfig, which owns config/sunlitmarket/
+    // deposit_values.json. Edits are persisted on the next save tick, so a script stays the
+    // single source of truth for as long as it keeps running.
+
+    /** SunlitMarket.depositPrice("minecraft:iron_ingot", 30) - explicit spur each; 0 refuses it. */
+    public void depositPrice(String itemId, int spur) {
+        try {
+            com.society.sunlitmarket.deposit.DepositConfig.setItemPrice(itemId, spur);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositPrice failed", t);
+        }
+    }
+
+    /** SunlitMarket.depositFluidRate("gtceu:diesel", 8) - spur per bucket. */
+    public void depositFluidRate(String fluidId, int perBucket) {
+        try {
+            com.society.sunlitmarket.deposit.DepositConfig.setFluidRate(fluidId, perBucket);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositFluidRate failed", t);
+        }
+    }
+
+    /** SunlitMarket.depositAccept("essentia", false) - channel is item/fluid/energy/essentia/mana. */
+    public void depositAccept(String channel, boolean allowed) {
+        try {
+            com.society.sunlitmarket.deposit.DepositConfig.setAccepted(channel, allowed);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositAccept failed", t);
+        }
+    }
+
+    /** Effective spur value of one item id as the bin prices it right now; -1 when unpriced. */
+    public int depositItemValue(String itemId) {
+        try {
+            Integer price = com.society.sunlitmarket.deposit.DepositConfig.itemPrice(itemId);
+            if (price != null) return price;
+            net.minecraft.world.item.ItemStack stack = Currency.item(itemId);
+            return stack.isEmpty() ? -1 : com.society.sunlitmarket.deposit.DepositValues.itemValue(stack);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositItemValue failed", t);
+        }
+        return -1;
+    }
+
+    /** Re-reads deposit_values.json; script overrides made before the call are discarded. */
+    public void depositReload() {
+        try {
+            com.society.sunlitmarket.deposit.DepositConfig.load();
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositReload failed", t);
+        }
+    }
+
+    // ---- virtual wallet ---------------------------------------------------------------
+
+    /** Wallet balance in spur. */
+    public long wallet(Player player) {
+        try {
+            return com.society.sunlitmarket.wallet.Wallet.balance(player);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.wallet failed", t);
+        }
+        return 0L;
+    }
+
+    /** Credits the wallet directly; use for quest rewards that should not become coins. */
+    public boolean walletAdd(Player player, long amount) {
+        try {
+            return com.society.sunlitmarket.wallet.Wallet.add(player, amount);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.walletAdd failed", t);
+        }
+        return false;
+    }
+
+    /** Debits the wallet; false and no change when the balance is short. */
+    public boolean walletTake(Player player, long amount) {
+        try {
+            return com.society.sunlitmarket.wallet.Wallet.take(player, amount);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.walletTake failed", t);
+        }
+        return false;
+    }
+
+    /** Converts the player's cash/bank into the wallet at the configured fee. */
+    public String walletDeposit(Player player) {
+        try {
+            return com.society.sunlitmarket.wallet.WalletExchange.deposit(player);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.walletDeposit failed", t);
+        }
+        return "钱包存入失败";
+    }
+
+    /** Converts wallet balance back into cash/bank at the configured fee. */
+    public String walletWithdraw(Player player, long amount) {
+        try {
+            return com.society.sunlitmarket.wallet.WalletExchange.withdraw(player, amount);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.walletWithdraw failed", t);
+        }
+        return "钱包取出失败";
+    }
+
     /** How many of an item id the player carries (scripts, quest checks). */
     public int countItems(Player player, String itemId) {
         try {

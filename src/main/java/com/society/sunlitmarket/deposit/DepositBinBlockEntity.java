@@ -124,28 +124,42 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
         return DepositValues.itemValue(items.getStackInSlot(0))
                 + DepositValues.fluidValue(tank.getFluid())
                 + DepositValues.energyValue(energy.getEnergyStored())
-                + DepositValues.essentiaValue(essentia.total())
+                + DepositValues.essentiaValue(essentia.view())
                 + DepositValues.manaValue(mana.stored());
     }
 
     /**
      * Pays out everything stored. The wallet is credited first: if the player cannot be paid, no
-     * goods are destroyed.
+     * goods are destroyed. With the wallet disabled the payout falls back to cash/bank, which can
+     * fail on a full inventory - hence the error is returned before anything is drained.
      */
     public String collect(ServerPlayer player) {
         int total = value();
         if (total <= 0) return "没有可回收的内容";
+        if (com.society.sunlitmarket.wallet.Wallet.enabled()) {
+            com.society.sunlitmarket.wallet.Wallet.add(player, total);
+            drain();
+            lastPayout = total;
+            lastMessage = "回收 +" + total + " → 钱包 " + com.society.sunlitmarket.wallet.Wallet.balance(player);
+            setChanged();
+            return lastMessage;
+        }
         String error = Currency.settle(player, null, null, ItemStack.EMPTY, 0, total);
         if (error != null && !error.isEmpty()) return error;
+        drain();
+        lastPayout = total;
+        lastMessage = "回收 +" + total + " spur";
+        setChanged();
+        return lastMessage;
+    }
+
+    /** Empties every intake port; only ever called once the payout is secured. */
+    private void drain() {
         items.setStackInSlot(0, ItemStack.EMPTY);
         tank.setFluid(FluidStack.EMPTY);
         energy.extractEnergy(energy.getEnergyStored(), false);
         essentia.clear();
         mana.clear();
-        lastPayout = total;
-        lastMessage = "回收 +" + total + " spur";
-        setChanged();
-        return lastMessage;
     }
 
     /** Drops the held stack back to the player; used when the block is broken. */
@@ -181,7 +195,7 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
         o.addProperty("energyValue", DepositValues.energyValue(energy.getEnergyStored()));
 
         o.addProperty("essentia", essentia.total());
-        o.addProperty("essentiaValue", DepositValues.essentiaValue(essentia.total()));
+        o.addProperty("essentiaValue", DepositValues.essentiaValue(essentia.view()));
         o.addProperty("essentiaReady", essentia.available());
         JsonObject aspects = new JsonObject();
         for (Map.Entry<String, Integer> entry : essentia.view().entrySet()) {

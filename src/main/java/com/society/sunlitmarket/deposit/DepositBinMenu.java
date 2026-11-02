@@ -20,6 +20,7 @@ public final class DepositBinMenu extends AbstractContainerMenu {
     private final BlockPos pos;
     private final Player player;
     private DepositBinBlockEntity bin;
+    private String walletMessage = "";
     private int ticks;
 
     public DepositBinMenu(int id, Inventory inventory, BlockPos pos) {
@@ -56,14 +57,28 @@ public final class DepositBinMenu extends AbstractContainerMenu {
         return found != null && found.stillValid(p);
     }
 
-    /** Screen button 0 = collect. Avoids a dedicated C2S packet. */
+    /**
+     * Screen buttons, routed through {@code handleInventoryButtonClick} so no dedicated C2S
+     * packet is needed: 0 = collect the bin, 1 = move cash into the wallet, 2 = withdraw all.
+     */
     @Override
     public boolean clickMenuButton(Player p, int id) {
-        if (id == 0 && p instanceof ServerPlayer serverPlayer) {
-            collect(serverPlayer);
-            return true;
+        if (!(p instanceof ServerPlayer serverPlayer) || p != player) return false;
+        switch (id) {
+            case 0 -> collect(serverPlayer);
+            case 1 -> {
+                walletMessage = com.society.sunlitmarket.wallet.WalletExchange.deposit(serverPlayer);
+                sync();
+            }
+            case 2 -> {
+                walletMessage = com.society.sunlitmarket.wallet.WalletExchange.withdrawAll(serverPlayer);
+                sync();
+            }
+            default -> {
+                return false;
+            }
         }
-        return false;
+        return true;
     }
 
     @Override
@@ -91,6 +106,11 @@ public final class DepositBinMenu extends AbstractContainerMenu {
         DepositBinBlockEntity found = bin();
         if (found == null) return;
         JsonObject state = found.state();
+        state.addProperty("wallet", com.society.sunlitmarket.wallet.Wallet.balance(serverPlayer));
+        state.addProperty("walletEnabled", DepositConfig.walletEnabled());
+        state.addProperty("feePercent", DepositConfig.exchangeFeePercent());
+        state.addProperty("minWithdraw", DepositConfig.minWithdraw());
+        if (!walletMessage.isEmpty()) state.addProperty("walletMessage", walletMessage);
         SunlitMarketMod.CHANNEL.send(PacketDistributor.PLAYER.with(() -> serverPlayer),
                 new DepositStateMessage(state.toString()));
     }
