@@ -63,9 +63,17 @@ public final class Currency {
         int balance = TradeMath.amount(((Number) account.getClass().getMethod("getBalance").invoke(account)).longValue());
         return new Bank(account, balance, account.getClass().getMethod("setBalance", int.class));
     }
-    public static int balance(Player player) {
+    /** Coins in the inventory plus the numismatics bank account; the virtual wallet is not included. */
+    public static int cashBalance(Player player) {
         try { Bank b = bank(player); return b == null ? coinBalance(player) : b.balance; }
         catch (ReflectiveOperationException | RuntimeException ex) { return -1; }
+    }
+    /** Everything the player can spend: cash/bank plus the virtual wallet. */
+    public static int balance(Player player) {
+        int cash = cashBalance(player);
+        if (cash < 0) return cash;
+        long wallet = com.society.sunlitmarket.wallet.Wallet.balance(player);
+        return (int) Math.min(Integer.MAX_VALUE, cash + wallet);
     }
     public static int coinBalance(Player player) {
         long sum = 0;
@@ -131,6 +139,16 @@ public final class Currency {
     }
     /** Positive moneyDelta pays the player. null source/target represents virtual stock. */
     public static String settle(Player player, Container source, Container target, ItemStack item, int count, int moneyDelta) {
+        return settle(player, source, target, item, count, moneyDelta, true);
+    }
+
+    /**
+     * @param useWallet when false the virtual wallet is skipped entirely, which is what a
+     *                  cash-to-wallet conversion needs: otherwise the wallet would pay for its own
+     *                  top-up and the fee would be pure burn.
+     */
+    private static String settle(Player player, Container source, Container target, ItemStack item,
+                                 int count, int moneyDelta, boolean useWallet) {
         if (player.level().isClientSide) return "Server-only transaction";
         if (count < 0 || (count > 0 && item.isEmpty())) return "Invalid goods";
         Container wallet = player.getInventory();
@@ -145,13 +163,21 @@ public final class Currency {
         boolean bankAttempted = false;
         Map<Container,List<ItemStack>> originals = new java.util.IdentityHashMap<>();
         plans.keySet().forEach(c -> originals.put(c,snapshot(c)));
+        // The virtual wallet covers a debit whole or not at all: a payment is never split across
+        // two backends, so a half-empty wallet behaves exactly like an absent one.
+        long walletBefore = com.society.sunlitmarket.wallet.Wallet.balance(player);
+        boolean walletDebit = useWallet && moneyDelta < 0
+                && com.society.sunlitmarket.wallet.Wallet.enabled()
+                && walletBefore >= -(long) moneyDelta;
         try {
             if (player.getPersistentData().getBoolean("sunlitmarket.bankUncertain")) return "银行需管理员核对后解锁";
-            b = moneyDelta == 0 ? null : bank(player);
+            b = (moneyDelta == 0 || walletDebit) ? null : bank(player);
             int next = b == null ? 0 : TradeMath.amount((long) b.balance + moneyDelta);
-            if (b == null && !coins(walletMain, moneyDelta)) return "余额不足、无法精确找零或背包空间不足";
+            if (b == null && !walletDebit && !coins(walletMain, moneyDelta)) return "余额不足、无法精确找零或背包空间不足";
             if (count > 0 && target != null && !insert(target == wallet ? walletMain : plans.get(target), item, count, target.getMaxStackSize()))
                 return "目标库存空间不足";
+            if (walletDebit && !com.society.sunlitmarket.wallet.Wallet.take(player, -(long) moneyDelta))
+                throw new IllegalStateException("Wallet debit was not confirmed");
             if (b != null) {
                 bankAttempted = true;
                 b.setter.invoke(b.account, next);
@@ -163,6 +189,7 @@ public final class Currency {
             return "";
         } catch (ReflectiveOperationException | RuntimeException ex) {
             originals.forEach(Currency::commit);
+            if (walletDebit) com.society.sunlitmarket.wallet.Wallet.set(player, walletBefore);
             boolean restored = !bankAttempted;
             if (bankAttempted && b != null) try {
                 b.setter.invoke(b.account,b.balance);
@@ -175,6 +202,11 @@ public final class Currency {
     }
     public static boolean pay(Player player, int amount) {
         return amount >= 0 && settle(player, null, null, ItemStack.EMPTY, 0, -amount).isEmpty();
+    }
+
+    /** Debits coins/bank only, never the virtual wallet. */
+    public static boolean payCash(Player player, int amount) {
+        return amount >= 0 && settle(player, null, null, ItemStack.EMPTY, 0, -amount, false).isEmpty();
     }
     public static void give(Player player, int amount) {
         if (amount < 0 || !settle(player, null, null, ItemStack.EMPTY, 0, amount).isEmpty())
