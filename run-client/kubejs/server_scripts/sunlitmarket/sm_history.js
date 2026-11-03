@@ -7,6 +7,9 @@
 // forward one 4h bucket at a time and trades once per bucket. It is idempotent: once the index
 // already holds bars it does nothing, so re-joining the world never re-seeds.
 //
+// Either way the script re-registers its merchants/indices and re-opens the chart panel on
+// every join, because script merchants live in memory only.
+//
 // It lives in run-client only and is never shipped to Sunlit Valley.
 
 if (!global.smHistory) global.smHistory = {ran: false}
@@ -15,7 +18,7 @@ let histFarmer = {
   id: 'hist_farmer',
   name: 'History Farmer',
   faction: 'test:village',
-  tag: 'sunlitmarket.history',
+  tag: 'sunlitmarket.history.farmer',
   offers: [
     { id: 'wheat', item: 'minecraft:wheat', count: 1, buy: 12, sell: 7 },
     { id: 'carrot', item: 'minecraft:carrot', count: 1, buy: 16, sell: 9 },
@@ -28,7 +31,7 @@ let histSmith = {
   id: 'hist_smith',
   name: 'History Smith',
   faction: 'test:village',
-  tag: 'sunlitmarket.history',
+  tag: 'sunlitmarket.history.smith',
   offers: [
     { id: 'coal', item: 'minecraft:coal', count: 1, buy: 24, sell: 14 },
     { id: 'copper', item: 'minecraft:copper_ingot', count: 1, buy: 40, sell: 24 },
@@ -39,7 +42,7 @@ let histSmith = {
 PlayerEvents.tick((event) => {
   let state = global.smHistory
   if (state.ran) return
-  if (event.player.age < 100) return
+  if (event.player.age < 200) return
   state.ran = true
 
   let player = event.player
@@ -47,11 +50,6 @@ PlayerEvents.tick((event) => {
   let world = server.overworld()
   let MarketData = Java.loadClass('com.society.sunlitmarket.market.MarketData')
   let data = MarketData.get(server)
-  let seeded = data.candles('hist.harvest', 4000, 120).size()
-  if (seeded >= 40) {
-    console.info('[SM-HISTORY] already seeded: ' + seeded + ' 4h bars, ' + data.fills().size() + ' fills; skipping')
-    return
-  }
 
   // Emerald is the run-client coin; the pack ships its own mapping.
   SunlitMarket.coinValue('minecraft:emerald', 1)
@@ -69,14 +67,24 @@ PlayerEvents.tick((event) => {
     ['hist_smith', 'minecraft:iron_ingot']
   ])
 
+  let seeded = data.candles('hist.harvest', 4000, 120).size()
+  if (seeded >= 40) {
+    console.info('[SM-HISTORY] already seeded: ' + seeded + ' 4h bars, ' + data.fills().size() + ' fills; skipping')
+  } else {
+    seed(player, server, world, data)
+  }
+
+  // Open the panel for the player: the command needs a player source, so run it as them.
+  let opened = server.runCommandSilent('execute as ' + player.username + ' run sunlitmarket chart hist.harvest')
+  console.info('[SM-HISTORY] chart request result=' + opened)
+})
+
+function seed(player, server, world, data) {
   // ServerLevel.getGameTime() is inherited from Level and KubeJS cannot see it, so read and
   // write the clock through ServerLevelData, which declares both members itself.
   let clock = world.getLevelData()
   let now = -1
   try { now = clock.getGameTime() } catch (err) { console.info('[SM-HISTORY] clock read failed: ' + err) }
-  if (now < 0) {
-    try { now = world.getGameTime() } catch (err) { console.info('[SM-HISTORY] level clock read failed: ' + err) }
-  }
   if (now < 0) {
     console.info('[SM-HISTORY] no readable game clock; aborting')
     return
@@ -125,5 +133,4 @@ PlayerEvents.tick((event) => {
   console.info('[SM-HISTORY] metal 1d=' + data.candles('hist.metal', 24000, 120).size()
       + ' 4h=' + data.candles('hist.metal', 4000, 120).size() + ' value=' + data.value('hist.metal'))
   if (failed > 0) console.info('[SM-HISTORY] view ' + SunlitMarket.view(player, 'hist_farmer'))
-  if (ok > 0) server.runCommandSilent('sunlitmarket chart hist.harvest')
-})
+}
