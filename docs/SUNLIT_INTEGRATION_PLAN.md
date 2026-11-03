@@ -1,6 +1,7 @@
 # Sunlit Valley × SunlitMarket 深度整合方案
 
-状态：设计稿（未动代码）。四个待定项已由作者拍板：1 关钱包、2 改经济日、3 身份识别由实现方定、4 接受仓边界由实现方推荐。
+状态：D1–D4（S1/S2）与 S3 联动已落地并部署到主实例 / -DEV / mirror；S0 校准待开服量数，S4 部署包待重打。
+运行时验收清单见 `TESTING.md` §17–§18。四个待定项已由作者拍板：1 关钱包、2 改经济日、3 身份识别由实现方定、4 接受仓边界由实现方推荐。
 
 调研基准：主实例 `G:\MinecraftGames\Sunlit Valley(BaopuEdition)` 的 kubejs 脚本与 `assets/society/lang`；jar 为 11-02 旧版（无 wallet/deposit/audit/treasury/futures）。
 
@@ -113,7 +114,7 @@ day = tick / 24000
 2. **M0 统计**：照 `serverEvents/updateCoinLeaderboard.js` 的做法遍历 `global.GLOBAL_BANK` 账户求和，喂给审计；`global.persistentData.debts` 里的债务单独记一项。审计里的 M0 就不再是 UNKNOWN。
 3. **HUD**：`SunlitHud.provider('sunlitmarket', fn)` 显示余额 / 通缉值 / 指数。纯 KubeJS，不动 mod。
 4. **任务联动**：`SunlitMarketEvents.afterTrade` → `player.stages.add(...)`；已有的 22 个阶段任务和 mastery 同步机制复用。
-5. **对话入口**：dialog 的 entry 支持 `"command"`（现有 `openshop @p banker`），加一条 `sunlitmarket open <merchant>` 即可。**注意权限**：`/sunlitmarket` 现在 requires 2，需要把 `open` 单独放到权限 0（它只打开自己的界面，没有额外能力）。
+5. **对话入口**：dialog 的 entry 支持 `"command"`（现有 `openshop @p banker`）。**实际落地时改了方向**：整合包的 10 个有名字 NPC 在 `svCustomers.js` 里是柜台的**顾客**（`npcKey` + `pool` 需求），不是 SunlitMarket 的商人，`/sunlitmarket near` 在他们身上解析不到商人。所以对话里开的是**行情面板**（`sunlitmarket chart`），交易仍然走柜台方块。权限侧：根节点降到 0，写操作单独挂 2。
 6. **债务一致**：SunlitMarket 给玩家付款（货架收购、接受仓）时，先扣 `server.persistentData.debts`，再入账，和出货箱 `handleShippingBinDebt` 一致。否则玩家可以用当铺绕开医院债务。
 
 ---
@@ -125,7 +126,7 @@ day = tick / 24000
 | S0 校准（只读） | 服务器银行总额、活跃玩家数、日均出货额；扫中州硬币来源 | 给出 C/R 建议值，不写死 |
 | S1 三处对齐 | D1 钱包 + D2 经济日 + D3 npcKey（mod）；`svCustomers.js` 改 npcKey + 修职业表 | 单测：睡觉推进日结 / 回拨不重复 / 跨重启；DEV 客户端右键 easy_npc 能开面板 |
 | S2 接受仓边界 | `-1` 语义 + `depositBlock` + 包脚本遍历 `global.trades` | DEV：出货箱能卖的物品放进去 → 合计 0、按钮置灰 |
-| S3 联动 | 好感度→结盟、M0、HUD、对话入口、债务先扣 | DEV：送礼后结盟值变化；HUD 显示余额；对话能开面板 |
+| S3 联动 ✅ | 好感度→结盟、M0、HUD、对话入口、债务先扣（mod：`PayoutSink` / `auditSupply` / 权限拆分） | 代码+单测完成，见 `TESTING.md` §18 的 6 条待验 |
 | S4 部署 | jar + config + 脚本 + 上线说明 | 服务器首日 M0/债务/日结三条曲线不跳变 |
 
 **C（当铺现金）与 R（发行准备金）不在本方案里拍数字**：C 决定「玩家能不能把东西卖给当铺」，设低了等于关掉收购。S0 量出 M0 后按 C ≈ 2–5% M0、R ≈ 1 个活跃日的回收流水给建议，再由作者定。

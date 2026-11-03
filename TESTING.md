@@ -371,3 +371,57 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 
 **未完成/阻塞**：
 - `wltest` 世界在 `ServerStartedEvent` 崩溃：`ftbbackups2 BackupHandler.initPreview` 的 `Block.m_284356_()` NPE（与本 mod 无关，属既有问题），因此该世界跑不到 tick 循环，配置落盘的运行时复核改在 DEV 做（DEV 09:40 已实测落盘）。
+
+
+## 18. 深度联动（2026-11-03，S3，代码完成 + 单测，未开客户端）
+
+按 `docs/SUNLIT_INTEGRATION_PLAN.md` 的 S3 落地。**这一批只做到构建/单测/部署，运行时全部待验。**
+
+### mod 侧（可单测的部分已覆盖）
+
+- **付款钩子 `PayoutSink`**（`currency/PayoutSink.java` + `Currency.observedSettle`）：三条付款路径
+  （柜台收购 `COUNTER_PURCHASE`、顾客采购 `NPC_DEMAND`、接受仓结算 `DEPOSIT_BIN_PAYOUT`）
+  都走 `Currency.settle` 的正数分支，所以在 `observedSettle` 里挂钩子一处就全覆盖。
+  `divert` 返回值被夹在 `0..amount`，抛异常/负数都退回 0（**钩子永远不能凭空造钱或吞掉整笔付款**）；
+  结算失败时回调 `rollback`。脚本侧入口：`SunlitMarket.payoutSink(divertFn, rollbackFn)`，传 `null` 卸载。
+- **审计 M0**（`AuditCheckpoint.supply` + `EconomyAudit.observeSupply` + `SunlitMarket.auditSupply(m0, debts)`）：
+  审计不再硬编码 `M0: UNKNOWN`，改为记录脚本上报的世界货币总量与未偿债务，随 checkpoint 落盘、跨重启保留；
+  从没上报过时仍然是 `UNKNOWN`（区分"没数据"和"数据是 0"）。数值不变时不 `setDirty`，避免每 5 分钟写盘。
+- **命令权限拆分**：`/sunlitmarket` 根节点降到权限 0（dialog 选项以玩家身份执行），
+  `rep/align/addalign` 的写节点、`wanted <值>`、`reload`、`unlock`、`debug` 单独挂权限 2。
+  只读的 `near/open/index/chart/factions/balance/locks/wallet` 对玩家开放。
+- **`MarketEventJS` 读接口**：`event.player / npc / faction / kind / price / cancelled`（原来只有 `data` 公有字段）。
+- **`SunlitMarket.topAlignment(player)` / `topFaction(player)`**：给 HUD 用。
+- **单测**：`PayoutSinkTest`（超额夹取 / 负数 / 抛异常 / 部分抵扣 / 卸载 / 双函数形态 + 默认 rollback）6 项，
+  `AuditCheckpointTest` 新增 2 项（上报值跨重启保留、未变化不置脏）。`gradle test` 全绿。
+
+### 整合包侧（主实例 `kubejs/server_scripts/sunlitmarket/`）
+
+| 脚本 | 作用 |
+|---|---|
+| `svFriendship.js` | `npcData[<id>].friendship` → `society:<id>` 结盟值，映射 `friendship*2`（100 好感=常客，500=挚友）；**只补不扣**，柜台赚到的额外结盟值不会被覆盖；登录 / 成交 / 30 秒轮询三个同步点（送礼不走成交事件） |
+| `svMoneySupply.js` | 按 `updateCoinLeaderboard.js` 的口径遍历 `global.GLOBAL_BANK.accounts` 求和 + `persistentData.debts` 合计 → `SunlitMarket.auditSupply`；开服 / 每 1200 tick / 登录上报 |
+| `svPayout.js` | 注册 payout sink：付款先扣 `persistentData.debts`（和出货箱 `handleShippingBinDebt` 同序），失败回调加回债务；复用 `society.shipping_bin.debt_paid` 文案提示 |
+| `svTradeStages.js` | `SunlitMarketEvents.afterTrade` → 阶段 `sm_pawn_first / sm_pawn_ten / sm_pawn_fifty`，并镜像成 unlock `sv.pawn.<stage>` 供 offer 引用 |
+| `svHud.js` | `SunlitHud.provider` 三个源（余额 / 结盟称号 / 通缉）+ 追加一块 `sunlitmarket` 面板；**读回 `SunlitHud.json()` 再追加**，因为 `panels()` 是整体替换，直接声明会把 `sunlitHud.js` 的营养/季节面板顶掉 |
+
+- 对话入口：`data/dialog/dialogs/sunlitmarket_<npc>_choice.json` 六份（banker/blacksmith/fisher/market/shepherd/trader），
+  选项 = 看店（`openshop @p <npc>`）/ 看行情（`sunlitmarket chart`）/ 再见。
+  `npcs/npcInteraction.js` 的通用分支改成先弹这个选择框（`SV_PAWN_CHOICE` 表控制，没装 mod 时自动回落原来的直接开店）。
+  **注意**：整合包里这些 NPC 是柜台的"顾客"（`sv.npc.*` 规则 + `pool` 需求），不是 SunlitMarket 的商人，
+  所以 `/sunlitmarket near` 在他们身上打不开面板——对话里能开的是行情面板，不是交易面板。
+
+### 部署
+
+- jar `sunlitmarket-1.20.1-0.1.0.jar` md5 `2f4e1abad4a8c7206dc3459f9f9a31b` → 主实例 / -DEV / mirror 三处一致。
+- 五个新脚本同时进主实例和 -DEV；六份 dialog 只进主实例（DEV 没有整合包数据）。
+- `server-pack-20261102-sunlitmarket/delta/` **仍是旧包**（D1–D4 之前的 `svCustomers.js`），S4 需要重打。
+
+### 待运行时验证（未开客户端）
+
+1. `SunlitMarket.payoutSink(fn, fn)` 的 Rhino 单方法接口转换是否成立（失败会打 `payoutSink failed`，付款退回全额，不会崩）。
+2. 送礼后结盟值是否真的变（`/sunlitmarket rep`），以及"只补不扣"是否符合预期。
+3. `svMoneySupply.js` 的 `GLOBAL_BANK.accounts.forEach((uuid, account) => ...)` 回调参数顺序是否与排行榜脚本一致。
+4. 审计状态里 `M0` / `M0Debts` / `M0Source` 三个字段是否落到 `status()`。
+5. HUD 面板与 `sunlitHud.js` 共存、`/reload` 后不重复。
+6. 对话选项里 `sunlitmarket chart` 以玩家身份执行能否打开面板（权限 0 拆分是否生效）。
