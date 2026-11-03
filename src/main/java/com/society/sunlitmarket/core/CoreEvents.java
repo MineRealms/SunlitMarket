@@ -74,5 +74,13 @@ public final class CoreEvents {
     }
     private static void logout(PlayerEvent.PlayerLoggedOutEvent e){if(e.getEntity() instanceof net.minecraft.server.level.ServerPlayer p)TradeSessions.close(p);}
     private static void stopping(net.minecraftforge.event.server.ServerStoppingEvent e){com.society.sunlitmarket.market.MarketExport.writeQuietly(e.getServer());com.society.sunlitmarket.audit.EconomyAudit.stop(e.getServer());}
-    private static void stopped(ServerStoppedEvent e){TradeSessions.clear();com.society.sunlitmarket.compat.MiddleEarthCompat.clear();com.society.sunlitmarket.audit.EconomyAudit.stop(e.getServer());}
+    private static void stopped(ServerStoppedEvent e){
+        TradeSessions.clear();
+        // A compat class that fails to load must never take the shutdown thread with it: the
+        // ServerStoppedEvent handler is the last thing the server does, so a throw here leaves a
+        // zombie process holding the world lock instead of exiting.
+        try{com.society.sunlitmarket.compat.MiddleEarthCompat.clear();}
+        catch(Throwable t){com.society.sunlitmarket.SunlitMarketMod.LOG.warn("[SunlitMarket] ME compat clear failed on shutdown",t);}
+        com.society.sunlitmarket.audit.EconomyAudit.stop(e.getServer());
+    }
 }
