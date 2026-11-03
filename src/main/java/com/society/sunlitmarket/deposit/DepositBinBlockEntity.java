@@ -44,6 +44,15 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
         @Override protected void onContentsChanged(int slot) {
             setChanged();
         }
+
+        /**
+         * Only items the bin would pay for go in. The bin has no slots to take things back out
+         * of, so anything else (shipping-bin goods, unpriced items) would sit there until the
+         * block is broken - and this check also covers hoppers and pipes.
+         */
+        @Override public boolean isItemValid(int slot, @NotNull ItemStack stack) {
+            return DepositValues.itemValue(stack.copyWithCount(1)) > 0;
+        }
     };
 
     private final FluidTank tank = new FluidTank(TANK_CAPACITY) {
@@ -138,7 +147,8 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
      * before anything is drained.
      */
     public String collect(ServerPlayer player) {
-        int total = value();
+        int[] paid = channelValues();
+        int total = paid[0] + paid[1] + paid[2] + paid[3] + paid[4];
         if (total <= 0) return "没有可回收的内容";
         long today = today();
         BuybackLedger ledger = DepositConfig.buybackEnabled() ? BuybackLedger.get(level.getServer()) : null;
@@ -163,7 +173,7 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
                 return "";
             });
             if (!error.isEmpty()) return lastMessage = error;
-            drain();
+            drain(paid);
             if (ledger != null) ledger.record(player, today, total);
             lastPayout = total;
             lastMessage = "回收 +" + total + " → 钱包 " + Wallet.balance(player);
@@ -173,7 +183,7 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
         String error = Treasury.payout(player, TreasuryData.Account.CASH, false, total, "DEPOSIT_BIN_PAYOUT",
                 () -> Currency.settle(player, null, null, ItemStack.EMPTY, 0, total, "DEPOSIT_BIN_PAYOUT"));
         if (!error.isEmpty()) return lastMessage = error;
-        drain();
+        drain(paid);
         if (ledger != null) ledger.record(player, today, total);
         lastPayout = total;
         lastMessage = "回收 +" + total + " spur";
@@ -181,7 +191,7 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
         return lastMessage;
     }
 
-    /** The economy day; neither the wall clock nor anything /time or sleeping can move. */
+    /** The economy day: follows sleeping like the pack's own day, never runs backwards. */
     private long today() {
         return level == null || level.getServer() == null ? 0L : com.society.sunlitmarket.core.EconomyClock.day(level.getServer());
     }
@@ -192,13 +202,35 @@ public final class DepositBinBlockEntity extends BlockEntity implements net.mine
         return BuybackLedger.get(level.getServer()).remaining(player, today());
     }
 
-    /** Empties every intake port; only ever called once the payout is secured. */
-    private void drain() {
+    /** Value of each port, in the order item, fluid, energy, essentia, mana. */
+    private int[] channelValues() {
+        return new int[]{
+                DepositValues.itemValue(items.getStackInSlot(0)),
+                DepositValues.fluidValue(tank.getFluid()),
+                DepositValues.energyValue(energy.getEnergyStored()),
+                DepositValues.essentiaValue(essentia.view()),
+                DepositValues.manaValue(mana.stored())};
+    }
+
+    /**
+     * Empties only the ports that were paid for; called once the payout is secured. A port worth
+     * nothing (an item whose price was withdrawn after it went in) keeps its contents instead of
+     * being destroyed for free. Energy keeps the sub-spur remainder it was not paid for.
+     */
+    private void drain(int[] paid) {
+        if (paid[0] > 0) items.setStackInSlot(0, ItemStack.EMPTY);
+        if (paid[1] > 0) tank.setFluid(FluidStack.EMPTY);
+        if (paid[2] > 0) energy.extractEnergy((int) Math.min(Integer.MAX_VALUE, (long) paid[2] * DepositConfig.fePerSpur()), false);
+        if (paid[3] > 0) essentia.clear();
+        if (paid[4] > 0) mana.clear();
+    }
+
+    /** Hands the held stack back to the player (shift-click with an empty hand). */
+    public ItemStack takeItem() {
+        ItemStack held = items.getStackInSlot(0);
         items.setStackInSlot(0, ItemStack.EMPTY);
-        tank.setFluid(FluidStack.EMPTY);
-        energy.extractEnergy(energy.getEnergyStored(), false);
-        essentia.clear();
-        mana.clear();
+        setChanged();
+        return held;
     }
 
     /** Drops the held stack back to the player; used when the block is broken. */

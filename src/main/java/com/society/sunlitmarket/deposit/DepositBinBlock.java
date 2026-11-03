@@ -63,9 +63,19 @@ public final class DepositBinBlock extends BaseEntityBlock {
         if (!(level.getBlockEntity(pos) instanceof DepositBinBlockEntity bin)) return InteractionResult.PASS;
         ItemStack held = player.getItemInHand(hand);
         if (!held.isEmpty() && !player.isShiftKeyDown()) {
+            if (!bin.items().isItemValid(0, held)) {
+                player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                        "接受仓不收此物品（出货箱能卖的请放进出货箱）"), true);
+                return InteractionResult.CONSUME;
+            }
             ItemStack remainder = bin.items().insertItem(0, held, false);
             player.setItemInHand(hand, remainder);
             bin.setChanged();
+            return InteractionResult.CONSUME;
+        }
+        if (held.isEmpty() && player.isShiftKeyDown()) {
+            ItemStack back = bin.takeItem();
+            if (!back.isEmpty() && !player.getInventory().add(back)) player.drop(back, false);
             return InteractionResult.CONSUME;
         }
         if (player instanceof ServerPlayer serverPlayer) {
