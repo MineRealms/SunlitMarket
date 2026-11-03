@@ -373,9 +373,10 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - `wltest` 世界在 `ServerStartedEvent` 崩溃：`ftbbackups2 BackupHandler.initPreview` 的 `Block.m_284356_()` NPE（与本 mod 无关，属既有问题），因此该世界跑不到 tick 循环，配置落盘的运行时复核改在 DEV 做（DEV 09:40 已实测落盘）。
 
 
-## 18. 深度联动（2026-11-03，S3，代码完成 + 单测，未开客户端）
+## 18. 深度联动（2026-11-03，S3 代码 + 单测，S4 服务器实测）
 
-按 `docs/SUNLIT_INTEGRATION_PLAN.md` 的 S3 落地。**这一批只做到构建/单测/部署，运行时全部待验。**
+按 `docs/SUNLIT_INTEGRATION_PLAN.md` 的 S3 落地。构建/单测之外，已在生产服务器（Mohist 1.20.1-ecf8d5ad / Java 21）跑过一轮，
+结果见下面的「服务器实测」。
 
 ### mod 侧（可单测的部分已覆盖）
 
@@ -413,18 +414,42 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 
 ### 部署
 
-- jar `sunlitmarket-1.20.1-0.1.0.jar` md5 `20ad1371525b6489d508ac729f040cfd` → 主实例 / -DEV / mirror 三处一致
+- jar `sunlitmarket-1.20.1-0.1.0.jar` sha256 `7fd1a3e6a4b0af7eedf4bb0a8f6882019daa1cadf4eaad3cf05fcdef8ca68361` → 主实例 / -DEV / mirror / 服务器四处一致
   （含 `deposit: keep a persisted refusal on reload` 的修复：`-1` 拒收落盘后重新读取仍是 -1，不会被夹成 0）。
 - 五个新脚本同时进主实例和 -DEV；六份 dialog 只进主实例（DEV 没有整合包数据）。
 - 新的服务端增量包已出：`server-pack-20261103-sunlitmarket/`（jar + 7 个 sunlitmarket 脚本 + `npcInteraction.js` +
-  6 份 dialog + `deposit_values.json` + 计划文档 + README + SHA256SUMS，jar sha256 `3cefd268…`）。
+  6 份 dialog + `deposit_values.json` + 计划文档 + README + SHA256SUMS，jar sha256 `7fd1a3e6…`）。
   旧的 `server-pack-20261102-sunlitmarket/` 保持原样，作为"上一版基线"存档；本包是它的增量。
 
-### 待运行时验证（未开客户端）
+### 服务器实测（2026-11-03，生产服 Mohist 1.20.1-ecf8d5ad / Java 21）
 
-1. `SunlitMarket.payoutSink(fn, fn)` 的 Rhino 单方法接口转换是否成立（失败会打 `payoutSink failed`，付款退回全额，不会崩）。
-2. 送礼后结盟值是否真的变（`/sunlitmarket rep`），以及"只补不扣"是否符合预期。
-3. `svMoneySupply.js` 的 `GLOBAL_BANK.accounts.forEach((uuid, account) => ...)` 回调参数顺序是否与排行榜脚本一致。
-4. 审计状态里 `M0` / `M0Debts` / `M0Source` 三个字段是否落到 `status()`。
-5. HUD 面板与 `sunlitHud.js` 共存、`/reload` 后不重复。
-6. 对话选项里 `sunlitmarket chart` 以玩家身份执行能否打开面板（权限 0 拆分是否生效）。
+jar `sunlitmarket-1.20.1-0.1.0.jar` sha256 `7fd1a3e6a4b0af7eedf4bb0a8f6882019daa1cadf4eaad3cf05fcdef8ca68361`（401,569 B），
+主实例 / -DEV / mirror / 服务器 `mods/` 四处一致。全部证据来自 Rosetta 桥的实时查询与 `logs/latest.log`：
+
+| 项 | 证据 |
+|---|---|
+| 脚本装载 | `Loaded 239/239 KubeJS server scripts in 0.229 s with 0 errors and 0 warnings` |
+| 商人注册 | `meMerchants.js#145: Middle-earth merchants registered` / `themedMerchants.js#85: themed merchants registered`，`MarketRegistry.all()=10` |
+| 付款钩子 | `[SV-INTEGRATION] debt-first payout sink installed` + `[SunlitMarket] payout sink installed`（Rhino 把双函数对象转成 `PayoutSink` 成立） |
+| M0 上报 | `[SV-INTEGRATION] M0=46805902 debts=176128`；`forEach((uuid, account) => account.getBalance())` 的参数顺序与排行榜脚本一致 |
+| 审计字段 | `status()` 里 `"M0":"46805902","M0Debts":"176128","M0Source":"PACK_SCRIPT@tick82426018"`，且跨重启保留 |
+| 脚本热重载 | `kubejs reload server_scripts` → `Loaded 239/239 … 0 errors`，1 秒后 `[SunlitMarket] committed staged script data (valid=true)`，`stagingOpen=false`、`merchants=10` 不丢 |
+| HUD | 服务器的 `sunlithud` 是 0.1.0 旧版（无 `provider`），`svHud.js` 检测后打印 `sunlithud 无 provider API（旧版），HUD 面板跳过`，不报错、不影响其余脚本 |
+
+**实测踩到的两个坑（已修，别再踩）**
+
+1. **不能直接覆盖运行中的 mod jar**。覆盖之后 JVM 里尚未加载的类会按旧索引去读新文件，`MiddleEarthCompat` 于是在
+   `ServerStoppedEvent` 里抛 `ClassNotFoundException`；关服线程被打断 → 进程不退、世界锁不放，表现为「发了 stop 但服务器还在」。
+   现在 `CoreEvents.stopped` 用 try/catch 兜住兼容调用，部署流程也改成：上传成 `…jar.new`，由重启脚本在进程退出后 `move` 就位。
+2. **Mohist 屏蔽 `/reload`**，`kubejs reload server_scripts` 不触发 `KubeJSPlugin#onServerReload`，脚本数据会永远停在 staging
+   （表现：`MarketRegistry.SCRIPTS=0 staging=10`）。现在 tick 里 staging 打开 20 tick 后自动提交。
+
+**停机 / 重启流程**：`tools/restart_server.cmd`（经 WMI `Win32_Process.Create` 脱离服务器 JVM 启动 → 轮询旧 PID →
+安装 `.jar.new` → 起服）。**不能用 `ProcessBuilder`/`start`**：子进程会随服务器 JVM 一起被回收，第一次就是这样把服务器
+留在停机状态 25 分钟。桥上的 `console stop` 也靠不住（见坑 1），需要硬停时用 `Runtime.halt()`，此时世界已在 stop 流程里存完。
+
+### 仍需玩家在线的验证
+
+1. 送礼后结盟值是否真的变（`/sunlitmarket rep`），以及"只补不扣"是否符合预期。
+2. 对话选项里 `sunlitmarket chart` 以玩家身份执行能否打开面板（权限 0 拆分是否生效）。
+3. HUD 面板与 `sunlitHud.js` 共存、`/reload` 后不重复（服务器 sunlithud 太旧，只能在客户端验）。
