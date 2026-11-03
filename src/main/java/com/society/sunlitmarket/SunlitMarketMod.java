@@ -208,6 +208,7 @@ public final class SunlitMarketMod {
                             return 1;
                         })
                         .then(Commands.argument("value", IntegerArgumentType.integer())
+                                .requires(ADMIN)
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                                     String faction = ResourceLocationArgument.getId(ctx, "faction").toString();
@@ -263,9 +264,14 @@ public final class SunlitMarketMod {
         return 1;
     }
 
+    /** Subcommands that change another player's state or reload server data. */
+    private static final java.util.function.Predicate<net.minecraft.commands.CommandSourceStack> ADMIN =
+            source -> source.hasPermission(2);
+
     private void onCommands(RegisterCommandsEvent event) {
+        // Players reach the panel from a dialog option, so the root itself must be open;
+        // every mutating subcommand carries ADMIN.
         event.getDispatcher().register(Commands.literal("sunlitmarket")
-                .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("near")
                         .executes(ctx -> openNearest(ctx.getSource(), 32))
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, 128))
@@ -283,8 +289,8 @@ public final class SunlitMarketMod {
                                     return 1;
                                 })))
                 .then(alignmentCommand("rep"))
-                .then(alignmentCommand("align"))
-                .then(alignmentCommand("addalign", true))
+                .then(alignmentCommand("align").requires(ADMIN))
+                .then(alignmentCommand("addalign", true).requires(ADMIN))
                 .then(Commands.literal("wanted")
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
@@ -293,6 +299,7 @@ public final class SunlitMarketMod {
                             return 1;
                         })
                         .then(Commands.argument("value", IntegerArgumentType.integer(0))
+                                .requires(ADMIN)
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                                     int value = IntegerArgumentType.getInteger(ctx, "value");
@@ -364,7 +371,7 @@ public final class SunlitMarketMod {
                                             ctx.getSource().sendSuccess(() -> Component.literal(result), false);
                                             return 1;
                                         }))))
-                .then(Commands.literal("reload").executes(ctx -> {
+                .then(Commands.literal("reload").requires(ADMIN).executes(ctx -> {
                     MarketRegistry.loadJson();
                     com.society.sunlitmarket.core.MarketRules.loadJson();
                     com.society.sunlitmarket.deposit.DepositConfig.load();
@@ -373,7 +380,7 @@ public final class SunlitMarketMod {
                     ctx.getSource().sendSuccess(() -> Component.literal("SunlitMarket config reloaded"), false);
                     return 1;
                 }))
-                .then(Commands.literal("unlock")
+                .then(Commands.literal("unlock").requires(ADMIN)
                         .then(Commands.argument("id", StringArgumentType.string())
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
@@ -395,7 +402,7 @@ public final class SunlitMarketMod {
                     ctx.getSource().sendSuccess(() -> Component.literal("Unlocks: [" + list + "]"), false);
                     return 1;
                 }))
-                .then(Commands.literal("debug")
+                .then(Commands.literal("debug").requires(ADMIN)
                         .then(Commands.argument("merchant", StringArgumentType.string())
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
