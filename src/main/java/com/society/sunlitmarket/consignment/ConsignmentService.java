@@ -12,9 +12,11 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Player-facing consignment operations. The house never mints: the buyer pays the seller directly,
- * the treasury only holds the money between the sale and the seller collecting it, and the fee is
- * moved from the till into the issuance reserve instead of being destroyed.
+ * Player-facing consignment operations. The house never mints and never lends the seller's money:
+ * the buyer's payment leaves circulation into the board's own claims ledger, which is a liability
+ * to the seller and is never mixed with pawn cash C (C is swept, refilled and spent by system
+ * payouts, so seller money parked there could be swept into R or crowded out). Only the fee goes
+ * to the issuance reserve.
  *
  * <p>Only plain items can be consigned: a listing stores an item id and a count, so anything with
  * NBT (enchanted gear, filled tanks, named books) would come back as a different item. Those are
@@ -84,13 +86,11 @@ public final class ConsignmentService {
             data.restore(listing, count);
             return error;
         }
-        Treasury.receive(p.server, TreasuryData.Account.CASH, total, "CONSIGNMENT_BUY");
         long fee = feeFor(total);
         long net = total - fee;
-        if (fee > 0 && Treasury.enabled()) {
-            TreasuryData till = Treasury.data(p.server);
-            if (till.withdraw(TreasuryData.Account.CASH, fee, "CONSIGNMENT_FEE"))
-                till.deposit(TreasuryData.Account.RESERVE, fee, "CONSIGNMENT_FEE");
+        if (fee > 0) {
+            if (Treasury.enabled()) Treasury.receive(p.server, TreasuryData.Account.RESERVE, fee, "CONSIGNMENT_FEE");
+            else Treasury.burn(p.server, fee, "CONSIGNMENT_FEE");
         }
         data.credit(listing.seller, listing.sellerName, net, fee);
         ServerPlayer seller = p.server.getPlayerList().getPlayer(listing.seller);
@@ -119,13 +119,16 @@ public final class ConsignmentService {
         long owed = data.claim(p.getUUID());
         if (owed <= 0) return "";
         if (owed > Integer.MAX_VALUE) owed = Integer.MAX_VALUE;
-        TreasuryData till = Treasury.enabled() ? Treasury.data(p.server) : null;
-        if (till != null && !till.withdraw(TreasuryData.Account.CASH, owed, "CONSIGNMENT_SALE"))
-            return "寄售款 " + owed + " 暂存：当铺现金不足（剩 " + till.cash() + "）";
+        boolean uncertainBefore = p.getPersistentData().getBoolean("sunlitmarket.bankUncertain");
         try {
             Currency.give(p, (int) owed);
         } catch (RuntimeException ex) {
-            if (till != null) till.reverse(TreasuryData.Account.CASH, owed, "CONSIGNMENT_SALE");
+            if (!uncertainBefore && p.getPersistentData().getBoolean("sunlitmarket.bankUncertain")) {
+                // The bank may already hold the money; paying again after an unlock would double it.
+                data.delivered(p.getUUID(), owed);
+                SunlitMarketMod.LOG.warn("[SunlitMarket] consignment payout {} to {} marked delivered: bank write uncertain", owed, p.getUUID());
+                return "银行写入状态不确定，寄售款 " + owed + " 需管理员核对";
+            }
             SunlitMarketMod.LOG.warn("[SunlitMarket] consignment payout failed for {}", p.getUUID(), ex);
             return "寄售款 " + owed + " 暂存：发放失败（背包或银行问题）";
         }
