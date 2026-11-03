@@ -47,6 +47,6 @@ public final class Merchant {
     }
 
     public boolean valid() {
-        return id != null && !id.isBlank() && (!tag.isBlank() || !npcType.isBlank()) && !offers.isEmpty();
+        return id != null && !id.isBlank() && (!tag.isBlank() || !npcType.isBlank() || !npcKey.isBlank()) && !offers.isEmpty();
     }
 }

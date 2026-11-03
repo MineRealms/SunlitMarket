@@ -71,7 +71,7 @@ public final class MarketRules {
                 throw new IllegalArgumentException("Invalid pool");
         }
         if(type.equals("npc") && (text(o,"faction").isBlank() || (text(o,"tag").isBlank()&&text(o,"npcType").isBlank()
-                &&text(o,"entity").isBlank()&&text(o,"profession").isBlank())))
+                &&text(o,"entity").isBlank()&&text(o,"profession").isBlank()&&text(o,"npcKey").isBlank())))
             throw new IllegalArgumentException("NPC selector and faction required");
         if(type.equals("law") && (text(o,"item").isBlank()&&text(o,"tag").isBlank())) throw new IllegalArgumentException("Law selector required");
         if(type.equals("law") && (number(o,"tier",1)<1 || number(o,"tier",1)>4)) throw new IllegalArgumentException("Law tier must be 1..4");
