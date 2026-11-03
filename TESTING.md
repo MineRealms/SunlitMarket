@@ -470,7 +470,7 @@ jar `sunlitmarket-1.20.1-0.1.0.jar` sha256 `7fd1a3e6a4b0af7eedf4bb0a8f6882019daa
 |---|---|---|
 | 商路 | 4 | 六位中州商人、四位主题商人、unlock 门槛 |
 | 柜台 | 5 | 造柜台、需求规则（10 秒扫描 / 最多 3 条 / 存活 1 分钟 / NPC 60 秒冷却 + 每日 12 次）、服务顾客、议价与赃物通缉、债务先扣 |
-| 接受仓 | 6 | 造接受仓、物品通道（2337 项全是 -1 的真相）、流体、FE（50000:1）、源质（1:1）、魔力（2000:1）、每日回收上限 |
+| 接受仓 | 6 | 造接受仓、物品通道（2337 项全是 -1 的真相 + 16 种采石废料）、流体九种、FE（50000:1）、源质分档（4/2/1 点 = 1 spur）、魔力（2000:1）、每日回收上限 |
 | 行情 | 6 | 行情面板、三条指数、期货、结盟值、任务阶段 |
 
 **验证**
@@ -483,3 +483,33 @@ jar `sunlitmarket-1.20.1-0.1.0.jar` sha256 `7fd1a3e6a4b0af7eedf4bb0a8f6882019daa
 - 章节组只做末尾追加，原有 7 组未改动。
 
 **未做**：没有开客户端打开任务书看排版；勾选、前置解锁、服务端同步都还没在游戏里点过。
+
+## 20. 接受仓定价全部搬进 KubeJS（2026-11-03）
+
+**问题**：用户要求「接收仓接受什么、怎么定价必须是 KubeJS 定义的，不要硬编码」。审计结果：
+物品 / 流体 / 五路开关 / 回收预算早就是脚本驱动的（`depositPrice` / `depositFluidRate` /
+`depositAccept` / `depositBudget`），但 **FE / 魔力 / 源质 / 单要素** 没有任何脚本入口，
+而且 `DepositConfig.defaults()` 里硬编码了 4 条 GT 流体单价（柴油 8 / 汽油 10 / 原油 6 / 硫酸 3）。
+这两处是错的，已修。
+
+**mod 侧改动**
+- `DepositConfig`：新增 `setEnergyRate / setManaRate / setEssentiaRate / setAspectRate`；
+  `setFluidRate` 支持 `"default"` 键（写 `fluidDefault`）；`defaults()` 删掉 4 条 GT 流体，
+  只剩通用默认值（流体 1 / FE 50000 / 魔力 2000 / 源质 1:1）。
+- `SunlitMarketBinding`：对应新增 `depositEnergyRate / depositManaRate / depositEssentiaRate /
+  depositAspectRate`，脚本里就是 `SunlitMarket.depositXxx(...)`。
+
+**脚本侧（新增两个，pack 里必须一起装）**
+
+| 文件 | priority | 内容 |
+|---|---|---|
+| `svDepositRates.js` | 21 | 流体 9 种 + default 1；FE 50000:1；魔力 2000:1；源质三档（常见 20 种 4 点、少见 21 种 2 点、稀有 7 种 1 点、兜底 4 点） |
+| `svDepositItems.js` | 22 | 16 种采石废料 1 spur/件；`global.trades` 里已给价的跳过，绝不覆盖 `svAcceptBoundary.js` 的 -1 |
+
+顺序：`svAcceptBoundary.js`(20) 先把 2337 项设 -1 → 21 写费率 → 22 开物品通道。
+源质从 1:1 收紧到 4/2/1 是刻意的：离心机批量产源质，1:1 等于印钞。
+
+**验证**
+- `node --check` 两个脚本通过；生成器 `--verify-repeat` 两次字节一致（`ea5609a3…`，21 任务）。
+- 服务器侧：**未上传**。2026-11-03 起 Rosetta 桥无响应（frp 端口可连但 0 字节返回，
+  即服务端 JVM 未运行），待服务端启动后补 `kubejs reload server_scripts` 与日志核对。

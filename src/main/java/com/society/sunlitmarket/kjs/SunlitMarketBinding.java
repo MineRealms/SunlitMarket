@@ -404,6 +404,42 @@ public final class SunlitMarketBinding {
         }
     }
 
+    /** SunlitMarket.depositEnergyRate(50000) - FE per one spur. */
+    public void depositEnergyRate(int fePerSpur) {
+        try {
+            com.society.sunlitmarket.deposit.DepositConfig.setEnergyRate(fePerSpur);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositEnergyRate failed", t);
+        }
+    }
+
+    /** SunlitMarket.depositManaRate(2000) - mana per one spur. */
+    public void depositManaRate(int manaPerSpur) {
+        try {
+            com.society.sunlitmarket.deposit.DepositConfig.setManaRate(manaPerSpur);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositManaRate failed", t);
+        }
+    }
+
+    /** SunlitMarket.depositEssentiaRate(1) - default essentia points per one spur. */
+    public void depositEssentiaRate(int pointsPerSpur) {
+        try {
+            com.society.sunlitmarket.deposit.DepositConfig.setEssentiaRate(pointsPerSpur);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositEssentiaRate failed", t);
+        }
+    }
+
+    /** SunlitMarket.depositAspectRate("auram", 4) - points per one spur for a single aspect. */
+    public void depositAspectRate(String aspectId, int pointsPerSpur) {
+        try {
+            com.society.sunlitmarket.deposit.DepositConfig.setAspectRate(aspectId, pointsPerSpur);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositAspectRate failed", t);
+        }
+    }
+
     /** SunlitMarket.depositAccept("essentia", false) - channel is item/fluid/energy/essentia/mana. */
     public void depositAccept(String channel, boolean allowed) {
         try {

@@ -109,10 +109,8 @@ public final class DepositConfig {
         buybackEnabled = true;
         buybackDailyCap = 100_000;
         buybackPlayerCap = 20_000;
-        FLUIDS.put("gtceu:diesel", 8);
-        FLUIDS.put("gtceu:gasoline", 10);
-        FLUIDS.put("gtceu:oil", 6);
-        FLUIDS.put("gtceu:sulfuric_acid", 3);
+        // No pack-specific entries here on purpose: which fluids are worth what is pack data,
+        // so it belongs in kubejs/server_scripts/sunlitmarket/svDepositRates.js, not in the mod.
     }
 
     /** Parses one already-read document and marks the config loaded; the test seam for {@link #load()}. */
@@ -323,7 +321,38 @@ public final class DepositConfig {
     public static synchronized void setFluidRate(String id, int perBucket) {
         ensureLoaded();
         if (id == null || id.isBlank()) return;
-        FLUIDS.put(id, Math.max(0, perBucket));
+        // "default" is the fallback rate for every fluid without its own entry.
+        if ("default".equals(id)) fluidDefault = Math.max(0, perBucket);
+        else FLUIDS.put(id, Math.max(0, perBucket));
+        dirty = true;
+    }
+
+    /** Script hook: FE per one spur. */
+    public static synchronized void setEnergyRate(int fePerSpur) {
+        ensureLoaded();
+        DepositConfig.fePerSpur = Math.max(1, fePerSpur);
+        dirty = true;
+    }
+
+    /** Script hook: mana per one spur. */
+    public static synchronized void setManaRate(int manaPerSpur) {
+        ensureLoaded();
+        DepositConfig.manaPerSpur = Math.max(1, manaPerSpur);
+        dirty = true;
+    }
+
+    /** Script hook: default essentia points per one spur. */
+    public static synchronized void setEssentiaRate(int pointsPerSpur) {
+        ensureLoaded();
+        DepositConfig.pointsPerSpur = Math.max(1, pointsPerSpur);
+        dirty = true;
+    }
+
+    /** Script hook: per-aspect override of points per one spur. */
+    public static synchronized void setAspectRate(String aspectId, int pointsPerSpur) {
+        ensureLoaded();
+        if (aspectId == null || aspectId.isBlank()) return;
+        ASPECTS.put(aspectId, Math.max(0, pointsPerSpur));
         dirty = true;
     }
 
