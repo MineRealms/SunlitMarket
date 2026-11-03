@@ -68,9 +68,30 @@ public final class CoreEvents {
     /** Futures settled while a player was offline are paid on their next login. */
     private static void login(PlayerEvent.PlayerLoggedInEvent e){
         if(e.getEntity() instanceof net.minecraft.server.level.ServerPlayer p){
+            seedMiddleEarthAlignment(p);
             String line=com.society.sunlitmarket.futures.FuturesService.deliver(p);
             if(!line.isEmpty())p.sendSystemMessage(net.minecraft.network.chat.Component.literal("[期货] "+line));
         }
+    }
+
+    /**
+     * Middle-earth has its own player faction (me:gondor, me:rohan, ...) and SunlitMarket keys
+     * alignment by the same ids, but nothing connected them. On the first login after the player
+     * picked a faction, give that faction a starting alignment so "your own people like you" holds.
+     * Seed once per player: later gains/losses are the player's own business.
+     */
+    private static void seedMiddleEarthAlignment(net.minecraft.server.level.ServerPlayer p){
+        int seed=CoreConfig.ME_FACTION_SEED.get();
+        if(seed<=0)return;
+        var data=p.getPersistentData();
+        if(data.getBoolean("sunlitmarket.meSeeded"))return;
+        String faction=com.society.sunlitmarket.compat.MiddleEarthCompat.savedFaction(p);
+        if(faction==null||faction.isBlank()||"UNKNOWN".equals(faction))return;
+        String id=faction.startsWith("me:")?faction:"me:"+faction;
+        if(!com.society.sunlitmarket.alignment.FactionRelations.factions().contains(id))return;
+        var alignment=com.society.sunlitmarket.alignment.AlignmentData.get(p.server);
+        if(alignment.get(p,id)==0)alignment.add(p,id,seed);
+        data.putBoolean("sunlitmarket.meSeeded",true);
     }
     private static void logout(PlayerEvent.PlayerLoggedOutEvent e){if(e.getEntity() instanceof net.minecraft.server.level.ServerPlayer p)TradeSessions.close(p);}
     private static void stopping(net.minecraftforge.event.server.ServerStoppingEvent e){com.society.sunlitmarket.market.MarketExport.writeQuietly(e.getServer());com.society.sunlitmarket.audit.EconomyAudit.stop(e.getServer());}

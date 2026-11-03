@@ -20,6 +20,7 @@ public final class CoreConfig {
     public static final ForgeConfigSpec.BooleanValue INSPECT_COUNTER, BRIBE_ENABLED, KILL_REWARDS;
     public static final ForgeConfigSpec.IntValue BRIBE_PRICE, BRIBE_REDUCTION, HAGGLE_FAILURE_LOSS, STOLEN_ALIGNMENT_LOSS, CONTRABAND_WANTED, KILL_LOSS, ENEMY_KILL_GAIN;
     public static final ForgeConfigSpec.BooleanValue TREASURY_ENABLED;
+    public static final ForgeConfigSpec.IntValue ME_FACTION_SEED;
     public static final ForgeConfigSpec.IntValue INDEX_OWNER_CAP;
     public static final ForgeConfigSpec.LongValue INITIAL_CASH, INITIAL_RESERVE, CASH_TARGET, CASH_CEILING, DAILY_REFILL, NPC_DAILY_BUDGET;
     static {
@@ -28,6 +29,10 @@ public final class CoreConfig {
         TEAM_ALIGNMENT = b.define("sharedAlignment", true);
         WANTED_SCOPE = b.comment("PERSONAL keeps wanted records on the player; TEAM uses the FTB party owner. Switching scope preserves both record sets without copying them.")
                 .defineEnum("wantedScope", WantedScope.PERSONAL);
+        b.pop().push("integration");
+        ME_FACTION_SEED = b.comment("Starting alignment granted to a player's own Middle-earth faction on first login.",
+                "Read from the Middle-earth player data (me:gondor, me:rohan, ...); 0 disables it.")
+                .defineInRange("meFactionSeedAlignment", 50, 0, 1000);
         b.pop().push("trade");
         REFUSE_BELOW = b.defineInRange("refuseBelow", -100, -100000, 100000);
         PREVENT_ARBITRAGE = b.define("preventSameQuoteArbitrage", true);
