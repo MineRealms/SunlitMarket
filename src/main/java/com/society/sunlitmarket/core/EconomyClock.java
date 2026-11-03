@@ -3,9 +3,10 @@ package com.society.sunlitmarket.core;
 import net.minecraft.server.MinecraftServer;
 
 /**
- * The economy's day counter. It runs on {@code getGameTime()}, which only advances one per server
- * tick: {@code /time set}, {@code /time add} and sleeping move {@code getDayTime()} but never this,
- * so nobody can fast-forward a budget reset or a contract expiry.
+ * The economy's day counter. It follows the clock the pack shows the player: {@code getDayTime()}
+ * advances when someone sleeps, which is how Sunlit Valley settles its shipping bins and seasons.
+ * {@code getGameTime()} is the monotonic floor, so {@code /time set} backwards can never replay a
+ * day boundary (a reset would be free money).
  */
 public final class EconomyClock {
     public static final long DAY = 24000L;
@@ -14,7 +15,10 @@ public final class EconomyClock {
     }
 
     public static long tick(MinecraftServer server) {
-        return server.overworld().getGameTime();
+        if (server == null) return 0L;
+        net.minecraft.server.level.ServerLevel overworld = server.overworld();
+        if (overworld == null) return 0L;
+        return Math.max(overworld.getDayTime(), overworld.getGameTime());
     }
 
     public static long day(MinecraftServer server) {

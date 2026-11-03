@@ -57,7 +57,7 @@ public final class MarketService {
         v.title = SunlitMarketConfig.tierFor(v.reputation).title;
         TradeSessions.Session session = TradeSessions.get(p);
         if (session != null && session.merchant.equals(m.id)) { v.session = session.id.toString(); v.sequence = session.sequence; }
-        long day = p.server.overworld().getDayTime() / 24000L;
+        long day = com.society.sunlitmarket.core.EconomyClock.day(p.server);
         StockData stock = StockData.get(p.server); stock.roll(day);
         LimitData limits = LimitData.get(p.server); limits.roll(day);
         for (int i = 0; i < m.offers.size(); i++) {
