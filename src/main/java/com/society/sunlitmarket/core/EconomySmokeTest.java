@@ -25,6 +25,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
@@ -234,6 +235,63 @@ public final class EconomySmokeTest {
             long net = (Wallet.balance(a) - startA) + (Wallet.balance(b) - startB);
             check(futures.claim(A_ID) == 0 && futures.claim(B_ID) == 0 && net == -burned, "players' net equals burned fees (" + burned + ")", passed);
 
+            // ---------------------------------------------------------------- command permissions
+            var dispatcher = server.getCommands().getDispatcher();
+            var player0 = server.createCommandSourceStack().withPermission(0);
+            var op = server.createCommandSourceStack().withPermission(2);
+            check(parses(dispatcher, player0, "sunlitmarket consign browse") && parses(dispatcher, player0, "sunlitmarket chart"),
+                    "players reach consign and chart", passed);
+            check(!parses(dispatcher, player0, "sunlitmarket treasury inject cash 1") && !parses(dispatcher, player0, "sunlitmarket bankunlock @s")
+                    && !parses(dispatcher, player0, "sunlitmarket open x") && parses(dispatcher, op, "sunlitmarket treasury inject cash 1"),
+                    "admin nodes refuse permission 0", passed);
+
+            // ---------------------------------------------------------------- consignment escrow
+            treasury.inject(TreasuryData.Account.CASH, -treasury.cash());
+            var consign = com.society.sunlitmarket.consignment.ConsignmentService.data(server);
+            long claimsBefore = consign.claimsTotal(), r3 = treasury.reserve();
+            b.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.STONE, 4));
+            String listed = com.society.sunlitmarket.consignment.ConsignmentService.list(b, 25, 4);
+            int listingId = consign.listingsOf(B_ID).stream().mapToInt(l -> l.id).max().orElse(-1);
+            check(listed.startsWith("已挂单") && listingId > 0, "consignment listed: " + listed, passed);
+            long aBefore = Wallet.balance(a);
+            String consignBought = com.society.sunlitmarket.consignment.ConsignmentService.buy(a, listingId, 4);
+            long consignFee = com.society.sunlitmarket.consignment.ConsignmentService.feeFor(100);
+            check(Wallet.balance(a) == aBefore - 100 && treasury.cash() == 0 && treasury.reserve() == r3 + consignFee
+                    && consign.claim(B_ID) == 100 - consignFee && consign.claimsTotal() == claimsBefore + 100 - consignFee,
+                    "sale escrowed outside C: " + consignBought, passed);
+            int coinsB = Currency.coinBalance(b);
+            String delivered = com.society.sunlitmarket.consignment.ConsignmentService.deliver(b);
+            check(Currency.coinBalance(b) == coinsB + 100 - consignFee && consign.claim(B_ID) == 0 && treasury.cash() == 0,
+                    "seller paid with C empty: " + delivered, passed);
+            treasury.inject(TreasuryData.Account.CASH, 100_000);
+
+            // ---------------------------------------------------------------- acceptance bin keeps what it does not pay for
+            check(!bin.items().isItemValid(0, new ItemStack(Items.BEDROCK)), "unpriced item refused at the door", passed);
+            DepositConfig.setItemPrice("minecraft:diamond", 5);
+            bin.energy().extractEnergy(bin.energy().getEnergyStored(), false);
+            check(bin.items().insertItem(0, new ItemStack(Items.DIAMOND, 1), false).isEmpty(), "priced item accepted", passed);
+            DepositConfig.refuse("minecraft:diamond");
+            bin.energy().receiveEnergy(DepositConfig.fePerSpur() * 3, false);
+            wa = Wallet.balance(a);
+            String partial = bin.collect(a);
+            check(Wallet.balance(a) == wa + 3 && bin.items().getStackInSlot(0).is(Items.DIAMOND),
+                    "payout drains only paid ports: " + partial, passed);
+            check(bin.takeItem().is(Items.DIAMOND) && bin.items().getStackInSlot(0).isEmpty(), "held item handed back", passed);
+
+            // ---------------------------------------------------------------- forward-only economy clock
+            long dayTime = level.getDayTime();
+            long eco0 = EconomyClock.tick(server);
+            level.setDayTime(dayTime + EconomyClock.DAY);
+            long eco1 = EconomyClock.tick(server);
+            check(eco1 == eco0 + EconomyClock.DAY, "sleep-like jump advances the economy day", passed);
+            level.setDayTime(1000);
+            long eco2 = EconomyClock.tick(server);
+            check(eco2 == eco1, "time set back does not rewind (" + eco1 + " -> " + eco2 + ")", passed);
+            long rolledDay = eco2 / EconomyClock.DAY;
+            check(Treasury.data(server).status(Treasury.policy()).get("economyDay").getAsLong() == rolledDay,
+                    "treasury day follows the clock without going back", passed);
+            level.setDayTime(dayTime);
+
             return "PASS " + passed.size() + " economy assertions: " + String.join(", ", passed);
         } catch (RuntimeException ex) {
             SunlitMarketMod.LOG.error("[SM-ECON-TEST] FAIL after {}", passed, ex);
@@ -262,8 +320,19 @@ public final class EconomySmokeTest {
             restore(a, invA, dataA);
             restore(b, invB, dataB);
             Currency.setCoinValue("minecraft:emerald", emerald);
+            // Drop the in-memory price/refusal edits made above; the file on disk is untouched.
+            DepositConfig.beginScripts();
+            DepositConfig.endScripts(true);
+            DepositConfig.load();
             SunlitMarketMod.LOG.info("[SM-ECON-TEST] completed assertions {}", passed);
         }
+    }
+
+    /** True when the whole command parses for this source, i.e. every node on the path is usable. */
+    private static boolean parses(com.mojang.brigadier.CommandDispatcher<net.minecraft.commands.CommandSourceStack> dispatcher,
+                                  net.minecraft.commands.CommandSourceStack source, String command) {
+        var result = dispatcher.parse(command, source);
+        return !result.getReader().canRead() && result.getExceptions().isEmpty() && result.getContext().getCommand() != null;
     }
 
     private static void restore(FakePlayer p, List<ItemStack> inventory, CompoundTag data) {
