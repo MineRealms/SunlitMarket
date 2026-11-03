@@ -455,3 +455,31 @@ jar `sunlitmarket-1.20.1-0.1.0.jar` sha256 `7fd1a3e6a4b0af7eedf4bb0a8f6882019daa
 1. 送礼后结盟值是否真的变（`/sunlitmarket rep`），以及"只补不扣"是否符合预期。
 2. 对话选项里 `sunlitmarket chart` 以玩家身份执行能否打开面板（权限 0 拆分是否生效）。
 3. HUD 面板与 `sunlitHud.js` 共存、`/reload` 后不重复（服务器 sunlithud 太旧，只能在客户端验）。
+
+---
+
+## 19. FTBQ「贸易」章节（2026-11-03，生产服已加载）
+
+新章节 `config/ftbquests/quests/chapters/trade.snbt`，21 个任务，挂在新建的章节组「支线-[贸易]」
+（`7B3E5A9C1D2F4068`，`order_index 23`）。生成器 `config/ftbquests/tools/build_trade_chapter.py`，
+业务 key → 16 位 ID 的映射持久化在 `tools/trade_ids.json`。
+
+**四条支线**
+
+| 支线 | 任务 | 覆盖内容 |
+|---|---|---|
+| 商路 | 4 | 六位中州商人、四位主题商人、unlock 门槛 |
+| 柜台 | 5 | 造柜台、需求规则（10 秒扫描 / 最多 3 条 / 存活 1 分钟 / NPC 60 秒冷却 + 每日 12 次）、服务顾客、议价与赃物通缉、债务先扣 |
+| 接受仓 | 6 | 造接受仓、物品通道（2337 项全是 -1 的真相）、流体、FE（50000:1）、源质（1:1）、魔力（2000:1）、每日回收上限 |
+| 行情 | 6 | 行情面板、三条指数、期货、结盟值、任务阶段 |
+
+**验证**
+
+- 生成器 `--verify-repeat` 两次渲染字节一致；ID 范围/唯一性、依赖无环、坐标不重复、全库 ID 不冲突全部通过。
+- 所有 icon 与任务物品都对生产服注册表做过 `ForgeRegistries.ITEMS.containsKey` 核对（31 个 ID 全部存在），
+  白名单固化在生成器的 `VERIFIED_ITEMS` 里。
+- 服务端 `/ftbquests reload` → `Loaded 9 chapter groups, 58 chapters, 2116 quests, 28 reward tables`，
+  0 报错（之前是 8 组 / 57 章）。
+- 章节组只做末尾追加，原有 7 组未改动。
+
+**未做**：没有开客户端打开任务书看排版；勾选、前置解锁、服务端同步都还没在游戏里点过。
