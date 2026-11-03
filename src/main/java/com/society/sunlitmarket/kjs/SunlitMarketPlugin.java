@@ -23,6 +23,7 @@ public final class SunlitMarketPlugin extends KubeJSPlugin {
         com.society.sunlitmarket.market.PriceModifiers.beginScripts();
         com.society.sunlitmarket.currency.Currency.beginScripts();
         com.society.sunlitmarket.futures.FuturesSpecs.beginScripts();
+        com.society.sunlitmarket.deposit.DepositConfig.beginScripts();
         event.add("SunlitMarket", new SunlitMarketBinding());
     }
 
@@ -53,6 +54,7 @@ public final class SunlitMarketPlugin extends KubeJSPlugin {
             com.society.sunlitmarket.market.PriceModifiers.endScripts(valid);
             com.society.sunlitmarket.currency.Currency.endScripts(valid);
             com.society.sunlitmarket.futures.FuturesSpecs.endScripts(valid);
+            com.society.sunlitmarket.deposit.DepositConfig.endScripts(valid);
             SunlitMarketMod.LOG.info("[SunlitMarket] committed staged script data (valid={})", valid);
         } catch (Throwable t) {
             SunlitMarketMod.LOG.warn("[SunlitMarket] staging commit failed", t);
@@ -68,6 +70,7 @@ public final class SunlitMarketPlugin extends KubeJSPlugin {
             com.society.sunlitmarket.market.PriceModifiers.endScripts(valid);
             com.society.sunlitmarket.currency.Currency.endScripts(valid);
             com.society.sunlitmarket.futures.FuturesSpecs.endScripts(valid);
+            com.society.sunlitmarket.deposit.DepositConfig.endScripts(valid);
             MarketRegistry.loadJson();
             com.society.sunlitmarket.core.MarketRules.loadJson();
             com.society.sunlitmarket.config.SunlitMarketConfig.invalidate();

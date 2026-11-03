@@ -75,6 +75,8 @@ public final class AuditCheckpoint extends SavedData {
         o.addProperty("M0", m0 == Long.MIN_VALUE ? "UNKNOWN" : Long.toString(m0));
         o.addProperty("M0Debts", m0Debts == Long.MIN_VALUE ? "UNKNOWN" : Long.toString(m0Debts));
         o.addProperty("M0Source", m0 == Long.MIN_VALUE ? "UNREPORTED" : "PACK_SCRIPT@tick" + m0Tick);
+        // The pack reports bank balances only; coins held as items are outside this number.
+        o.addProperty("M0Scope", "BANK_ACCOUNTS_ONLY");
         o.addProperty("C", "SEE_TREASURY"); o.addProperty("R", "SEE_TREASURY");
         o.addProperty("durability", "BEST_EFFORT; checkpoint and JSONL are not atomic; crashes may lose undetectable tails");
         JsonObject src = new JsonObject(); sources.forEach(src::addProperty); o.add("sources", src);

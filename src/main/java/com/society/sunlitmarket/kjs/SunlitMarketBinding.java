@@ -387,9 +387,7 @@ public final class SunlitMarketBinding {
     /** SunlitMarket.depositBlock("minecraft:wheat") - the bin refuses this item outright. */
     public void depositBlock(String itemId) {
         try {
-            if (itemId != null && !itemId.isBlank()) {
-                com.society.sunlitmarket.deposit.DepositConfig.setItemPrice(itemId, -1);
-            }
+            com.society.sunlitmarket.deposit.DepositConfig.refuse(itemId);
         } catch (Throwable t) {
             SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositBlock failed", t);
         }

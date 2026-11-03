@@ -30,6 +30,13 @@ public final class DepositConfig {
     private static final String FILE = "deposit_values.json";
 
     private static final Map<String, Integer> ITEMS = new LinkedHashMap<>();
+    /**
+     * Items a script refuses (SunlitMarket.depositBlock). Kept apart from ITEMS and never written to
+     * deposit_values.json: the script re-asserts them on every load, so an item the pack stops
+     * pricing is accepted again instead of being refused forever by a stale file entry.
+     */
+    private static final java.util.Set<String> REFUSED = new java.util.HashSet<>();
+    private static java.util.Set<String> refusedStaging;
     private static final Map<String, Integer> FLUIDS = new LinkedHashMap<>();
     private static final Map<String, Integer> ASPECTS = new LinkedHashMap<>();
 
@@ -169,6 +176,11 @@ public final class DepositConfig {
         buybackPlayerCap = Math.max(0, number(buyback, "playerCap", 20_000));
     }
 
+    /** The document {@link #save()} would write; the test seam for the persisted shape. */
+    static synchronized JsonObject toJsonForTest() {
+        return write();
+    }
+
     private static JsonObject write() {
         JsonObject root = new JsonObject();
         JsonObject accept = new JsonObject();
@@ -235,7 +247,33 @@ public final class DepositConfig {
     /** Explicit spur per item, or null when the pawnshop table should decide. */
     public static synchronized Integer itemPrice(String id) {
         ensureLoaded();
+        if (REFUSED.contains(id)) return -1;
         return ITEMS.get(id);
+    }
+
+    /** Script refusal; staged during a script load, live otherwise. */
+    public static synchronized void refuse(String id) {
+        if (id == null || id.isBlank()) return;
+        (refusedStaging != null ? refusedStaging : REFUSED).add(id);
+    }
+
+    public static synchronized void beginScripts() {
+        refusedStaging = new java.util.HashSet<>();
+    }
+
+    /**
+     * Commits the staged refusals. Persisted -1 entries the scripts now refuse anyway are dropped
+     * from the file (older builds wrote one per shipping-bin item); other -1 entries stay, they
+     * are an administrator's explicit refusal.
+     */
+    public static synchronized void endScripts(boolean valid) {
+        if (refusedStaging != null && valid) {
+            REFUSED.clear();
+            REFUSED.addAll(refusedStaging);
+            ensureLoaded();
+            if (ITEMS.entrySet().removeIf(e -> e.getValue() < 0 && REFUSED.contains(e.getKey()))) dirty = true;
+        }
+        refusedStaging = null;
     }
 
     public static synchronized int fluidRate(String id) {

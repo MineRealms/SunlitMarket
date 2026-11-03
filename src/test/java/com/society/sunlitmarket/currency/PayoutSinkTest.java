@@ -47,4 +47,23 @@ class PayoutSinkTest {
         PayoutSink withoutRollback = PayoutSink.of((player, amount, reason) -> 0L, null);
         withoutRollback.rollback(null, 10L, "MARKET_SELL");
     }
+
+    @Test void aScriptLoadReplacesTheSinkOnlyWhenItSucceeds() {
+        PayoutSink live = (player, amount, reason) -> 1L;
+        Currency.payoutSink(live);
+        try {
+            Currency.beginScripts();
+            PayoutSink next = (player, amount, reason) -> 2L;
+            Currency.payoutSink(next);
+            assertEquals(live, Currency.payoutSink(), "staged until the load commits");
+            Currency.endScripts(false);
+            assertEquals(live, Currency.payoutSink(), "a failed load keeps the old sink");
+
+            Currency.beginScripts();
+            Currency.endScripts(true);
+            assertNull(Currency.payoutSink(), "a load that no longer installs a sink removes it");
+        } finally {
+            Currency.resetValues();
+        }
+    }
 }

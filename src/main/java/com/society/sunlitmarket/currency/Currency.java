@@ -35,10 +35,10 @@ public final class Currency {
         values.put("numismatics:neptunium_coin", 32768); values.put("numismatics:ancient_coin", 262144);
         values.put("numismatics:prismatic_coin", 16777216);
     }
-    public static synchronized void beginScripts() { staging = new LinkedHashMap<>(); defaults(staging); }
+    public static synchronized void beginScripts() { staging = new LinkedHashMap<>(); defaults(staging); stagedSink = null; }
     public static synchronized void endScripts(boolean valid) {
-        if (staging != null && valid) { VALUES.clear(); VALUES.putAll(staging); }
-        staging = null;
+        if (staging != null && valid) { VALUES.clear(); VALUES.putAll(staging); PAYOUT_SINK = stagedSink; }
+        staging = null; stagedSink = null;
         EconomyAudit.mappingChanged();
     }
     public static synchronized void resetValues() {
@@ -206,9 +206,13 @@ public final class Currency {
 
     /** Packs settle debt (or anything else) before the player sees a payout. */
     private static volatile PayoutSink PAYOUT_SINK;
+    /** Sink installed by the script load in progress; a valid load replaces (or removes) the live one. */
+    private static PayoutSink stagedSink;
 
     /** Installs the diversion hook; {@code null} restores plain payouts. */
-    public static void payoutSink(PayoutSink sink) { PAYOUT_SINK = sink; }
+    public static synchronized void payoutSink(PayoutSink sink) {
+        if (staging != null) stagedSink = sink; else PAYOUT_SINK = sink;
+    }
 
     public static PayoutSink payoutSink() { return PAYOUT_SINK; }
 
