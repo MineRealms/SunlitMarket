@@ -263,6 +263,18 @@ public final class SunlitMarketBinding {
         return "";
     }
 
+    /** Dialog name key of an entity (banker, blacksmith, ...); empty when its name carries none. */
+    public String npcKey(Object entity) {
+        try {
+            if (entity instanceof net.minecraft.world.entity.Entity target) {
+                return MarketRegistry.readNpcKey(target);
+            }
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] npcKey failed", t);
+        }
+        return "";
+    }
+
     /** Current server-side view for a merchant (balance, stock, limits, locks) as JSON. */
     public String view(Player player, String merchantId) {
         try {
@@ -327,12 +339,23 @@ public final class SunlitMarketBinding {
     // deposit_values.json. Edits are persisted on the next save tick, so a script stays the
     // single source of truth for as long as it keeps running.
 
-    /** SunlitMarket.depositPrice("minecraft:iron_ingot", 30) - explicit spur each; 0 refuses it. */
+    /** SunlitMarket.depositPrice("minecraft:iron_ingot", 30) - explicit spur each; -1 refuses it. */
     public void depositPrice(String itemId, int spur) {
         try {
             com.society.sunlitmarket.deposit.DepositConfig.setItemPrice(itemId, spur);
         } catch (Throwable t) {
             SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositPrice failed", t);
+        }
+    }
+
+    /** SunlitMarket.depositBlock("minecraft:wheat") - the bin refuses this item outright. */
+    public void depositBlock(String itemId) {
+        try {
+            if (itemId != null && !itemId.isBlank()) {
+                com.society.sunlitmarket.deposit.DepositConfig.setItemPrice(itemId, -1);
+            }
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.depositBlock failed", t);
         }
     }
 

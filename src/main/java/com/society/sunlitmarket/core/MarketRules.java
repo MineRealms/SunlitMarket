@@ -114,9 +114,10 @@ public final class MarketRules {
     }
     private static String normalizeId(String value){return value.indexOf(':')<0?"minecraft:"+value:value;}
     private static boolean matchesNpc(JsonObject o,Entity entity,String npcType){
-        String tag=text(o,"tag"),type=text(o,"npcType"),kind=text(o,"entity"),profession=text(o,"profession");
+        String tag=text(o,"tag"),type=text(o,"npcType"),kind=text(o,"entity"),profession=text(o,"profession"),key=text(o,"npcKey");
         boolean selector=false,matched=false;
         if(!tag.isBlank()){selector=true;matched|=entity.getTags().contains(tag);}
+        if(!key.isBlank()){selector=true;matched|=key.equals(MarketRegistry.readNpcKey(entity));}
         if(!type.isBlank()){selector=true;matched|=type.equals(npcType);}
         if(!kind.isBlank()){selector=true;matched|=normalizeId(kind).equals(entityId(entity));}
         if(selector&&!matched)return false;

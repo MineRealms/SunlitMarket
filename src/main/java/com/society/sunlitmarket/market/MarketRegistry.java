@@ -128,6 +128,12 @@ public final class MarketRegistry {
         for (Merchant merchant : all()) {
             if (!merchant.tag.isBlank() && tags.contains(merchant.tag)) return merchant;
         }
+        String npcKey = readNpcKey(entity);
+        if (!npcKey.isBlank()) {
+            for (Merchant merchant : all()) {
+                if (npcKey.equals(merchant.npcKey)) return merchant;
+            }
+        }
         String npcType = readNpcType(entity);
         if (!npcType.isBlank()) {
             for (Merchant merchant : all()) {
@@ -137,6 +143,27 @@ public final class MarketRegistry {
         String explicit = entity.getPersistentData().getString("sunlitmarket.merchant");
         if (!explicit.isBlank()) return get(explicit);
         return null;
+    }
+
+    private static final java.util.regex.Pattern NPC_KEY =
+            java.util.regex.Pattern.compile("dialog\\.npc\\.([A-Za-z0-9_]+)\\.name");
+
+    /** Dialog name key of an entity (banker, blacksmith, ...), empty when its name carries none. */
+    public static String readNpcKey(Entity entity) {
+        try {
+            net.minecraft.network.chat.Component name = entity.getCustomName();
+            if (name == null) return "";
+            return npcKeyFromJson(net.minecraft.network.chat.Component.Serializer.toJson(name));
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    /** Pulls the id out of a serialised name component; works for translate and plain text names. */
+    public static String npcKeyFromJson(String json) {
+        if (json == null || json.isEmpty()) return "";
+        java.util.regex.Matcher matcher = NPC_KEY.matcher(json);
+        return matcher.find() ? matcher.group(1) : "";
     }
 
     /** Reads ME's NpcData.Type without linking against the Connector-remapped mod. */
@@ -161,6 +188,7 @@ public final class MarketRegistry {
             o.addProperty("faction", merchant.faction);
             o.addProperty("npcType", merchant.npcType);
             o.addProperty("tag", merchant.tag);
+            o.addProperty("npcKey", merchant.npcKey);
             JsonArray offers = new JsonArray();
             for (Offer offer : merchant.offers) {
                 JsonObject f = new JsonObject();

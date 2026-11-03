@@ -16,6 +16,8 @@ public final class Merchant {
     public String npcType = "";
     /** Optional entity tag, e.g. sunlitmarket.shire_farmer. */
     public String tag = "";
+    /** Optional dialog name key, e.g. banker from dialog.npc.banker.name. Locale independent. */
+    public String npcKey = "";
     public List<Offer> offers = new ArrayList<>();
 
     public Merchant() {
@@ -28,6 +30,7 @@ public final class Merchant {
         m.faction = o.has("faction") ? o.get("faction").getAsString() : "sunlitmarket:default";
         m.npcType = o.has("npcType") ? o.get("npcType").getAsString() : "";
         m.tag = o.has("tag") ? o.get("tag").getAsString() : "";
+        m.npcKey = o.has("npcKey") ? o.get("npcKey").getAsString() : "";
         if (o.has("offers") && o.get("offers").isJsonArray()) {
             JsonArray array = o.getAsJsonArray("offers");
             for (JsonElement e : array) {
