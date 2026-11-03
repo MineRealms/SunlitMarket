@@ -60,7 +60,7 @@ public final class CoreSelfTest {
             data.set(p,"sunlitmarket:test",0);
             MarketRegistry.addScriptMerchant("{\"id\":\""+migrationId+"\",\"tag\":\"sunlitmarket.test.migration\",\"faction\":\"sunlitmarket:test\",\"offers\":[{\"id\":\"dirt\",\"legacyIndex\":0,\"item\":\"minecraft:dirt\",\"buy\":1,\"stock\":10,\"limit\":5}]}");
             StockData stock=StockData.get(p.server);LimitData limits=LimitData.get(p.server);
-            long migrationDay=p.server.overworld().getDayTime()/24000L;stock.roll(migrationDay);limits.roll(migrationDay);
+            long migrationDay=EconomyClock.day(p.server);stock.roll(migrationDay);limits.roll(migrationDay);
             stock.take(migrationId+"#0",10,4);limits.add(p,migrationId+"#0",2);
             var migrated=MarketService.view(p,MarketRegistry.get(migrationId)).offers.get(0);
             check(migrated.stock==6&&migrated.used==2,"legacy offer migration stock="+migrated.stock+",used="+migrated.used,passed);

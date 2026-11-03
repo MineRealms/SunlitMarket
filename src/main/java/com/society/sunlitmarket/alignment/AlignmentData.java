@@ -27,7 +27,8 @@ public final class AlignmentData extends SavedData {
     }
     public static AlignmentData get(MinecraftServer server) {
         AlignmentData data = server.overworld().getDataStorage().computeIfAbsent(AlignmentData::load, AlignmentData::new, NAME);
-        data.currentDay = server.overworld().getDayTime() / 24000L;
+        // Same clock as the daily decay roll, so a new entry never starts days "in the past".
+        data.currentDay = com.society.sunlitmarket.core.EconomyClock.day(server);
         data.ensureMigrated(server);
         return data;
     }

@@ -60,7 +60,7 @@ public final class BuybackLedger extends SavedData {
     }
 
     private void roll(long today) {
-        if (day == today) return;
+        if (day != Long.MIN_VALUE && today <= day) return;
         day = today;
         spent = 0;
         perPlayer.clear();

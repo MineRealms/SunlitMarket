@@ -41,6 +41,18 @@ class TreasuryDataTest {
         assertEquals(300, data.cash(), "40 days offline still issue only one refill");
     }
 
+    @Test void anEarlierDayNeverRollsAgain() {
+        TreasuryData data = fresh();
+        assertTrue(data.withdraw(CASH, 900, "TEST"));
+        data.roll(11, POLICY);
+        assertEquals(400, data.cash());
+        data.roll(10, POLICY);
+        data.roll(11, POLICY);
+        assertEquals(400, data.cash(), "a day seen before refills nothing");
+        data.roll(12, POLICY);
+        assertEquals(700, data.cash());
+    }
+
     @Test void refillNeverExceedsReserve() {
         TreasuryData data = TreasuryData.create(new TreasuryData.Policy(0, 120, 1000, 2000, 300, 500));
         data.roll(1, POLICY);

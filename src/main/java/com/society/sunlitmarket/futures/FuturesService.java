@@ -138,8 +138,8 @@ public final class FuturesService {
 
     /** Settles expired series every second and pays whoever is online. */
     public static void tick(MinecraftServer server) {
+        if (server.getTickCount() % 20 != 0) return;
         long now = EconomyClock.tick(server);
-        if (now % 20L != 0L) return;
         settle(server, now);
     }
 

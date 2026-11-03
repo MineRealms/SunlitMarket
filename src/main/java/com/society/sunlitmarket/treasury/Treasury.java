@@ -44,7 +44,8 @@ public final class Treasury {
 
     /** Called from the server tick so the daily refill also happens on quiet days. */
     public static void tick(MinecraftServer server) {
-        if (enabled() && EconomyClock.tick(server) % 200L == 0L) data(server);
+        // Cadence on real server ticks; the economy clock decides only which day it is.
+        if (enabled() && server.getTickCount() % 200 == 0) data(server);
     }
 
     /**

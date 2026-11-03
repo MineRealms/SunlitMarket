@@ -128,11 +128,11 @@ public final class SunlitMarketMod {
         if (event.phase != TickEvent.Phase.END) return;
         MinecraftServer server = event.getServer();
         if (server == null) return;
-        // The economy clock, not getDayTime(): a frozen daylight cycle (doDaylightCycle=false)
-        // would stop both the config flush and the daily alignment roll.
+        // Observed every tick so the economy clock never misses a forward step; the cadence of
+        // housekeeping uses real server ticks, which keep running when daylight is frozen.
         long dayTime = com.society.sunlitmarket.core.EconomyClock.tick(server);
         // KubeJS can override deposit rates mid-session; persist those edits without blocking.
-        if (dayTime % 200L == 0L && com.society.sunlitmarket.deposit.DepositConfig.dirty()) {
+        if (server.getTickCount() % 200 == 0 && com.society.sunlitmarket.deposit.DepositConfig.dirty()) {
             com.society.sunlitmarket.deposit.DepositConfig.save();
             LOG.info("[SunlitMarket] deposit_values.json updated by script");
         }

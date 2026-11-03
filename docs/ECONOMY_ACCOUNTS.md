@@ -4,9 +4,15 @@
 
 ## 经济时钟
 
-`core/EconomyClock`：`day = overworld.getGameTime() / 24000`。gameTime每tick只加一，`/time set|add`和睡觉都改不动它。资金日结、NPC预算、接受仓日额度、K线分桶、期货到期全部用它。货架补货（StockData/LimitData）和柜台顾客配额（CustomerLedger）仍按可见日期，不在本次范围。
+`core/EconomyClock` + `core/EconomyClockData`（`<world>/data/sunlitmarket_clock.dat`）：一个只增不减的经济tick，`day = tick / 24000`。
 
-旧存档的接受仓日额度原来按dayTime记录，升级后第一次读取会把当天额度重置一次，不会多发钱。
+- 每个tick观察一次两个原版时钟，经济tick前进 `max(dayTime增量, gameTime增量, 0)`。
+- 睡觉让dayTime跳到天亮，经济日随之推进，和整合包的出货箱早晨结算、季节、`global.getDay()`对齐。
+- `/time set` 往回调（例如常见的 `/time set day` 会把dayTime设回1000）只是一个负增量，此时gameTime的1 tick照常计入：经济日不会倒退，不会重复日结、重置预算或推迟期货。
+- 冻结昼夜（`doDaylightCycle=false`）时靠gameTime继续走；`/time add` 是管理员主动推进，照常计入。
+- 首次创建时取 `max(dayTime, gameTime)`，与上一版的取值一致，升级不跳变。
+
+资金日结、NPC预算、接受仓日额度、货架补货/限购、柜台顾客配额、结盟值每日衰减、K线分桶、期货到期全部用它；资金日结和接受仓额度只在天数变大时结算。只有赃物热度仍按dayTime（换算会让已有赃物一次性冷却）。周期性检查（日结、期货结算、配置落盘）按服务器真实tick计数，不依赖经济tick取模。
 
 ## 账户
 

@@ -50,7 +50,8 @@ public final class TreasuryData extends SavedData {
      * down collapse into this single roll; there is no catch-up issuance.
      */
     public void roll(long day, Policy policy) {
-        if (day == lastRollDay) return;
+        // Forward only: the economy clock never goes back, and a stale day must not re-roll.
+        if (lastRollDay != Long.MIN_VALUE && day <= lastRollDay) return;
         boolean first = lastRollDay == Long.MIN_VALUE;
         lastRollDay = day;
         npcSpent = 0;

@@ -118,7 +118,8 @@ public final class MarketService {
         if (unit <= 0) return "该交易方向未开放";
         int total = TradeMath.amount((long) unit * qty), count = TradeMath.amount((long) offer.count * qty);
         int reward = TradeMath.amount((long) offer.repGain * qty);
-        long day = p.server.overworld().getDayTime() / 24000L;
+        // Same day source as view(): a shelf must not restock in one path and not the other.
+        long day = com.society.sunlitmarket.core.EconomyClock.day(p.server);
         StockData stock = StockData.get(p.server); stock.roll(day); LimitData limits = LimitData.get(p.server); limits.roll(day);
         String key = stockKey(m, index), legacyKey = legacyStockKey(m, index);
         if (action == ACTION_BUY && offer.stock >= 0 && stock.get(key, legacyKey, offer.stock) < qty) return "库存不足";

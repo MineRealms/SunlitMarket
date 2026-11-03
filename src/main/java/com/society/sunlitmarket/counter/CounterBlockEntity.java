@@ -68,7 +68,7 @@ public final class CounterBlockEntity extends BlockEntity implements net.minecra
             var hook=com.society.sunlitmarket.core.MarketHooks.fire(new com.society.sunlitmarket.core.MarketHooks.Event(
                     "beforeRequest",null,npc,identity.faction(),request.id.toString(),request.goods,request.ask));
             if(hook.cancelled||hook.price<1||hook.price>10000000)continue;
-            if(!CustomerLedger.get(sl.getServer()).reserve(npc.getUUID(),now,sl.getServer().overworld().getDayTime()/24000L))continue;
+            if(!CustomerLedger.get(sl.getServer()).reserve(npc.getUUID(),now,com.society.sunlitmarket.core.EconomyClock.day(sl.getServer())))continue;
             request.ask=hook.price;
             be.requests.add(request);be.setChanged();
             com.society.sunlitmarket.core.MarketHooks.fire(new com.society.sunlitmarket.core.MarketHooks.Event(
