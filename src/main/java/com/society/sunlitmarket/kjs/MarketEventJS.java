@@ -8,4 +8,12 @@ public final class MarketEventJS extends EventJS {
     public MarketEventJS(MarketHooks.Event data){this.data=data;}
     public void cancelTrade(){data.cancelled=true;}
     public void setPrice(int price){data.price=price;}
+    // Read accessors: Rhino reaches these as event.player / event.npc / event.price.
+    public net.minecraft.server.level.ServerPlayer getPlayer(){return data.player;}
+    public net.minecraft.world.entity.Entity getNpc(){return data.npc;}
+    public String getFaction(){return data.faction;}
+    public String getKind(){return data.kind;}
+    public String getRequestId(){return data.requestId;}
+    public int getPrice(){return data.price;}
+    public boolean isCancelled(){return data.cancelled;}
 }

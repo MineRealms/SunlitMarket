@@ -143,6 +143,42 @@ public final class SunlitMarketBinding {
         }
     }
 
+    /** Highest positive alignment this player holds, 0 when none. */
+    public int topAlignment(Player player) {
+        try {
+            if (player instanceof ServerPlayer serverPlayer) {
+                int best = 0;
+                for (int value : AlignmentData.get(serverPlayer.server).snapshot(player).values()) {
+                    if (value > best) best = value;
+                }
+                return best;
+            }
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] topAlignment failed", t);
+        }
+        return 0;
+    }
+
+    /** Faction id behind {@link #topAlignment}; empty when the player has none. */
+    public String topFaction(Player player) {
+        try {
+            if (player instanceof ServerPlayer serverPlayer) {
+                String best = "";
+                int bestValue = 0;
+                for (var entry : AlignmentData.get(serverPlayer.server).snapshot(player).entrySet()) {
+                    if (entry.getValue() > bestValue) {
+                        bestValue = entry.getValue();
+                        best = entry.getKey();
+                    }
+                }
+                return best;
+            }
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] topFaction failed", t);
+        }
+        return "";
+    }
+
     /** Current tier title for a faction, e.g. 常客. Empty when no tier matches. */
     public String title(Player player, String faction) {
         try {
@@ -544,6 +580,34 @@ public final class SunlitMarketBinding {
             SunlitMarketMod.LOG.warn("[SunlitMarket] countItems failed", t);
         }
         return 0;
+    }
+
+    // ---- economy hooks ----------------------------------------------------------------
+
+    /**
+     * SunlitMarket.payoutSink({ divert: (player, amount, reason) => diverted, rollback: (player, diverted, reason) => {} })
+     * runs before any payout (pawn sale, NPC demand, acceptance bin) and may keep part of it,
+     * e.g. to settle hospital debt first. Pass null to remove the hook.
+     */
+    public void payoutSink(com.society.sunlitmarket.currency.PayoutSink.Divert divert,
+                           com.society.sunlitmarket.currency.PayoutSink.Rollback rollback) {
+        try {
+            com.society.sunlitmarket.currency.Currency.payoutSink(
+                    divert == null ? null : com.society.sunlitmarket.currency.PayoutSink.of(divert, rollback));
+            SunlitMarketMod.LOG.info("[SunlitMarket] payout sink {}", divert == null ? "removed" : "installed");
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.payoutSink failed", t);
+        }
+    }
+
+    /** SunlitMarket.auditSupply(m0, debts) - the pack's world money total and unpaid debt. */
+    public void auditSupply(long total, long debts) {
+        try {
+            var server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+            if (server != null) com.society.sunlitmarket.audit.EconomyAudit.observeSupply(server, total, debts);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.auditSupply failed", t);
+        }
     }
 
     /** Reload config/sunlitmarket/merchants.json. Script merchants are kept. */
