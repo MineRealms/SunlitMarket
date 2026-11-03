@@ -513,3 +513,41 @@ jar `sunlitmarket-1.20.1-0.1.0.jar` sha256 `7fd1a3e6a4b0af7eedf4bb0a8f6882019daa
 - `node --check` 两个脚本通过；生成器 `--verify-repeat` 两次字节一致（`ea5609a3…`，21 任务）。
 - 服务器侧：**未上传**。2026-11-03 起 Rosetta 桥无响应（frp 端口可连但 0 字节返回，
   即服务端 JVM 未运行），待服务端启动后补 `kubejs reload server_scripts` 与日志核对。
+
+## 21. 玩家寄售行（2026-11-03）
+
+补齐审计缺口 7（玩家之间没有现货市场）。新包 `com.society.sunlitmarket.consignment`：
+
+| 文件 | 作用 |
+|---|---|
+| `ConsignmentData` | 挂单账本 + 待领货款 + 统计，`SavedData` 存 `world/data/sunlitmarket_consignment.dat`。纯记账，不碰注册表，可直接单测 |
+| `ConsignmentService` | 挂单 / 买入 / 撤单 / 领款 / 查看，全部在服务端线程 |
+| `ConsignmentDataTest` | 9 个单测（部分成交、售罄、参数校验、每人上限、货款账本、撤单、存档往返、失败回滚、费率） |
+
+**命令**（`/sunlitmarket consign ...`，全部权限 0，`status` 权限 2）
+
+| 子命令 | 行为 |
+|---|---|
+| `sell <单价> [数量]` | 把主手物品挂上去，数量默认整叠 |
+| `browse` | 列出全部挂单（JSON） |
+| `buy <编号> [数量]` | 买入，数量默认 1 |
+| `cancel <编号>` | 撤单，剩余数量退回背包 |
+| `mine` | 自己的挂单 + 待领货款 |
+| `claim` | 领取待领货款 |
+
+**资金路径（不增发）**
+1. 买家付款走 `Currency.settle(...)`：物品入库 + 扣款是一个原子结算，失败自动回滚库存与余额。
+2. 扣掉的钱由 `Treasury.receive(CASH, ...)` 记进当铺现金——**不是**凭空消失，也不是凭空产生。
+3. 抽成（默认 200 bps = 2%）从 CASH 挪进 RESERVE，不销毁；余额进 `claims` 账本。
+4. 卖家在线当场 `Currency.give` 到账（会经过债务先扣的 payout sink）；离线就挂账，上线后 `consign claim` 领。
+5. 扣货顺序是「先减挂单、再结算」：两步之间崩服最多丢一笔成交，不会重复卖。
+
+**限制**
+- 挂单只存 item id + 数量，所以带 NBT 的物品（附魔 / 命名 / 装填过的）一律拒收，避免退回时变样。
+- 每人同时最多 8 个挂单，全服 400 个；单价 1..1,000,000 spur。
+- 抽成由 `kubejs/server_scripts/sunlitmarket/svConsignment.js` 设定（`SunlitMarket.consignmentFee(bps)`，上限 2000），符合「价格写在 KubeJS」的约定。
+
+**验证**
+- `gradle --no-daemon test build` 通过：**131 个单测**（新增 9）。
+- **没有做 GUI**：目前只有命令。要做「柜台加寄售页签」需要动 `MarketScreen`，按约定 GUI 由作者验收。
+- **没有实机验证**：2026-11-03 服务端未运行（Rosetta 桥无响应），命令与资金路径只在单测层面验过。
