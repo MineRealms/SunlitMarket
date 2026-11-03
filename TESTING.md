@@ -417,7 +417,7 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - jar `sunlitmarket-1.20.1-0.1.0.jar` sha256 `7fd1a3e6a4b0af7eedf4bb0a8f6882019daa1cadf4eaad3cf05fcdef8ca68361` → 主实例 / -DEV / mirror / 服务器四处一致
   （含 `deposit: keep a persisted refusal on reload` 的修复：`-1` 拒收落盘后重新读取仍是 -1，不会被夹成 0）。
 - 五个新脚本同时进主实例和 -DEV；六份 dialog 只进主实例（DEV 没有整合包数据）。
-- 新的服务端增量包已出：`server-pack-20261103-sunlitmarket/`（jar + 7 个 sunlitmarket 脚本 + `npcInteraction.js` +
+- 新的服务端增量包已出：`server-pack-20261103-sunlitmarket/`（jar + 9 个 sunlitmarket 脚本 + `npcInteraction.js` +
   6 份 dialog + `deposit_values.json` + 计划文档 + README + SHA256SUMS，jar sha256 `7fd1a3e6…`）。
   旧的 `server-pack-20261102-sunlitmarket/` 保持原样，作为"上一版基线"存档；本包是它的增量。
 
@@ -428,13 +428,15 @@ jar `sunlitmarket-1.20.1-0.1.0.jar` sha256 `7fd1a3e6a4b0af7eedf4bb0a8f6882019daa
 
 | 项 | 证据 |
 |---|---|
-| 脚本装载 | `Loaded 239/239 KubeJS server scripts in 0.229 s with 0 errors and 0 warnings` |
+| 脚本装载 | `Loaded 241/241 KubeJS server scripts in 0.245 s with 0 errors and 0 warnings`（第一轮只传了 7 个 sv 脚本，补上 `svIndices.js` / `meSeasonPrices.js` 后为 241） |
 | 商人注册 | `meMerchants.js#145: Middle-earth merchants registered` / `themedMerchants.js#85: themed merchants registered`，`MarketRegistry.all()=10` |
 | 付款钩子 | `[SV-INTEGRATION] debt-first payout sink installed` + `[SunlitMarket] payout sink installed`（Rhino 把双函数对象转成 `PayoutSink` 成立） |
 | M0 上报 | `[SV-INTEGRATION] M0=46805902 debts=176128`；`forEach((uuid, account) => account.getBalance())` 的参数顺序与排行榜脚本一致 |
 | 审计字段 | `status()` 里 `"M0":"46805902","M0Debts":"176128","M0Source":"PACK_SCRIPT@tick82426018"`，且跨重启保留 |
 | 脚本热重载 | `kubejs reload server_scripts` → `Loaded 239/239 … 0 errors`，1 秒后 `[SunlitMarket] committed staged script data (valid=true)`，`stagingOpen=false`、`merchants=10` 不丢 |
 | HUD | 服务器的 `sunlithud` 是 0.1.0 旧版（无 `provider`），`svHud.js` 检测后打印 `sunlithud 无 provider API（旧版），HUD 面板跳过`，不报错、不影响其余脚本 |
+| 价格指数 | `/sunlitmarket index` 返回 `sv.produce / sv.metal / sv.delicacy` 三条（值为 `n/a`，因为还没有真实成交，指数只由成交推动） |
+| 季节价格 | `[SunlitMarket] seasonal multipliers applied: summer@93% leek=1.1 white_mushroom=0.9` |
 
 **实测踩到的两个坑（已修，别再踩）**
 
