@@ -309,7 +309,7 @@ public final class DepositConfig {
     public static synchronized void setItemPrice(String id, int spur) {
         ensureLoaded();
         if (id == null || id.isBlank()) return;
-        ITEMS.put(id, Math.max(0, spur));
+        ITEMS.put(id, Math.max(-1, spur));
         dirty = true;
     }
 

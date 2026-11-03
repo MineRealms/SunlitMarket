@@ -44,7 +44,8 @@ public final class DepositValues {
     public static int itemUnit(String id) {
         if (id == null || id.isEmpty()) return 0;
         Integer configured = DepositConfig.itemPrice(id);
-        if (configured != null) return configured;
+        // -1 is an explicit refusal: the pack uses it for everything the shipping bin already pays.
+        if (configured != null) return configured < 0 ? 0 : configured;
         refresh();
         return marketUnit.getOrDefault(id, 0);
     }
