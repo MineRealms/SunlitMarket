@@ -18,6 +18,8 @@ public final class AuditCheckpoint extends SavedData {
     private String epoch = "";
     private long sequence, writtenSequence;
     private boolean clean = true, reconciliationRequired;
+    /** Latest world money supply reported by a pack script; MIN_VALUE = never reported. */
+    private long m0 = Long.MIN_VALUE, m0Debts = Long.MIN_VALUE, m0Tick = Long.MIN_VALUE;
 
     private static final class Day {
         long attempted, written, dropped, confirmed, failed, unknown;
@@ -55,13 +57,25 @@ public final class AuditCheckpoint extends SavedData {
         if (gaps.size() == 64) gaps.remove(0);
         gaps.add(e.epoch() + ":" + e.sequence()); reconciliationRequired = true; setDirty();
     }
+    /**
+     * Records a world money-supply observation. SunlitMarket never computes this itself: the
+     * pack owns the bank and the debt ledger, so the number arrives from a script.
+     */
+    public void supply(long total, long debts, long tick) {
+        if (total < 0) return;
+        if (total == m0 && debts == m0Debts) return;
+        m0 = total; m0Debts = debts; m0Tick = tick; setDirty();
+    }
     public JsonObject status() {
         JsonObject o = new JsonObject(); o.addProperty("scope", "SUNLITMARKET_OBSERVED_FLOWS");
         o.addProperty("epoch", epoch); o.addProperty("attempted", attempted); o.addProperty("written", written);
         o.addProperty("dropped", dropped); o.addProperty("confirmed", confirmed); o.addProperty("failed", failed); o.addProperty("unknown", unknown);
         o.addProperty("observedNet", observedNet.toString()); o.addProperty("attemptSequence", sequence); o.addProperty("writtenSequence", writtenSequence);
         o.addProperty("reconciliationRequired", reconciliationRequired); o.addProperty("cleanStop", clean);
-        o.addProperty("M0", "UNKNOWN"); o.addProperty("C", "SEE_TREASURY"); o.addProperty("R", "SEE_TREASURY");
+        o.addProperty("M0", m0 == Long.MIN_VALUE ? "UNKNOWN" : Long.toString(m0));
+        o.addProperty("M0Debts", m0Debts == Long.MIN_VALUE ? "UNKNOWN" : Long.toString(m0Debts));
+        o.addProperty("M0Source", m0 == Long.MIN_VALUE ? "UNREPORTED" : "PACK_SCRIPT@tick" + m0Tick);
+        o.addProperty("C", "SEE_TREASURY"); o.addProperty("R", "SEE_TREASURY");
         o.addProperty("durability", "BEST_EFFORT; checkpoint and JSONL are not atomic; crashes may lose undetectable tails");
         JsonObject src = new JsonObject(); sources.forEach(src::addProperty); o.add("sources", src);
         return o;
@@ -89,6 +103,7 @@ public final class AuditCheckpoint extends SavedData {
         t.putLong("confirmed", confirmed); t.putLong("failed", failed); t.putLong("unknown", unknown); t.putString("net", observedNet.toString());
         t.putString("epoch", epoch); t.putLong("sequence", sequence); t.putLong("writtenSequence", writtenSequence);
         t.putBoolean("clean", clean); t.putBoolean("reconciliationRequired", reconciliationRequired);
+        t.putLong("m0", m0); t.putLong("m0Debts", m0Debts); t.putLong("m0Tick", m0Tick);
         CompoundTag src = new CompoundTag(); sources.forEach(src::putLong); t.put("sources", src);
         CompoundTag dates = new CompoundTag(); days.forEach((date, d) -> {
             CompoundTag row = new CompoundTag(); row.putLong("attempted", d.attempted); row.putLong("written", d.written); row.putLong("dropped", d.dropped);
@@ -105,6 +120,9 @@ public final class AuditCheckpoint extends SavedData {
         catch (NumberFormatException ex) { c.reconciliationRequired=true; }
         c.epoch=t.getString("epoch"); c.sequence=t.getLong("sequence"); c.writtenSequence=t.getLong("writtenSequence");
         c.clean=t.getBoolean("clean"); c.reconciliationRequired|=t.getBoolean("reconciliationRequired") || t.getInt("schema")<2;
+        c.m0=t.contains("m0")?t.getLong("m0"):Long.MIN_VALUE;
+        c.m0Debts=t.contains("m0Debts")?t.getLong("m0Debts"):Long.MIN_VALUE;
+        c.m0Tick=t.contains("m0Tick")?t.getLong("m0Tick"):Long.MIN_VALUE;
         CompoundTag src=t.getCompound("sources"); for(String k:src.getAllKeys())c.sources.put(k,src.getLong(k));
         CompoundTag dates=t.getCompound("days"); for(String key:dates.getAllKeys()) {
             CompoundTag row=dates.getCompound(key); Day d=new Day(); d.attempted=row.getLong("attempted"); d.written=row.getLong("written"); d.dropped=row.getLong("dropped");

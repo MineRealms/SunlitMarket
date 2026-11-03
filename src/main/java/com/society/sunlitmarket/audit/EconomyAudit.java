@@ -131,6 +131,18 @@ public final class EconomyAudit {
                     "direct wallet leg; companion cash legs are counted separately; no C/R backing is implied");
         } catch (Throwable ex) { observerError(); }
     }
+    /**
+     * Accepts a world money-supply observation from a pack script. The pack owns the bank and
+     * the debt ledger, so SunlitMarket records the number instead of computing it.
+     */
+    public static void observeSupply(MinecraftServer server, long total, long debts) {
+        try {
+            if (server == null || server != owner || stopping) return;
+            if (!server.isSameThread()) { server.execute(() -> observeSupply(server, total, debts)); return; }
+            if (checkpoint == null) return;
+            checkpoint.supply(total, debts, server.overworld().getGameTime());
+        } catch (Throwable ex) { observerError(); }
+    }
     public static String status(MinecraftServer server) {
         if (server != owner || checkpoint == null) return "audit unavailable; coverage UNKNOWN";
         JsonObject o = checkpoint.status();
