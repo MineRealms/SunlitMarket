@@ -302,14 +302,16 @@ public final class SunlitMarketMod {
             source -> source.hasPermission(2);
 
     private void onCommands(RegisterCommandsEvent event) {
-        // Players reach the panel from a dialog option, so the root itself must be open;
-        // every mutating subcommand carries ADMIN.
+        // The root stays open so players can reach consign/chart/index; anything that changes
+        // state or opens a shop without visiting its NPC carries ADMIN on its own node.
+        // CoreCommands registers admin children under the same literal: Brigadier merges the
+        // two trees but keeps only the first root's requirement, so neither root may gate.
         event.getDispatcher().register(Commands.literal("sunlitmarket")
-                .then(Commands.literal("near")
+                .then(Commands.literal("near").requires(ADMIN)
                         .executes(ctx -> openNearest(ctx.getSource(), 32))
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, 128))
                                 .executes(ctx -> openNearest(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "radius")))))
-                .then(Commands.literal("open")
+                .then(Commands.literal("open").requires(ADMIN)
                         .then(Commands.argument("merchant", StringArgumentType.string())
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
