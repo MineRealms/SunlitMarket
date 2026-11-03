@@ -279,6 +279,24 @@ public final class SunlitMarketMod {
         return 1;
     }
 
+    /** {@code /sunlitmarket consign sell}: lists the main-hand stack; {@code count < 0} means all of it. */
+    private static int consign(net.minecraft.commands.CommandSourceStack source, int price, int count)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+        int wanted = count < 0 ? player.getMainHandItem().getCount() : count;
+        String result = com.society.sunlitmarket.consignment.ConsignmentService.list(player, price, wanted);
+        source.sendSuccess(() -> Component.literal(result), false);
+        return 1;
+    }
+
+    private static int consignBuy(net.minecraft.commands.CommandSourceStack source, int id, int count)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+        String result = com.society.sunlitmarket.consignment.ConsignmentService.buy(player, id, count);
+        source.sendSuccess(() -> Component.literal(result), false);
+        return 1;
+    }
+
     /** Subcommands that change another player's state or reload server data. */
     private static final java.util.function.Predicate<net.minecraft.commands.CommandSourceStack> ADMIN =
             source -> source.hasPermission(2);
@@ -335,6 +353,48 @@ public final class SunlitMarketMod {
                     }
                     return ids.size();
                 }))
+                .then(Commands.literal("consign")
+                        .then(Commands.literal("sell")
+                                .then(Commands.argument("price", IntegerArgumentType.integer(1, com.society.sunlitmarket.consignment.ConsignmentData.MAX_UNIT_PRICE))
+                                        .executes(ctx -> consign(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "price"), -1))
+                                        .then(Commands.argument("count", IntegerArgumentType.integer(1))
+                                                .executes(ctx -> consign(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "price"),
+                                                        IntegerArgumentType.getInteger(ctx, "count"))))))
+                        .then(Commands.literal("browse").executes(ctx -> {
+                            ctx.getSource().sendSuccess(() -> Component.literal(
+                                    com.society.sunlitmarket.consignment.ConsignmentService.browse(ctx.getSource().getServer()).toString()), false);
+                            return 1;
+                        }))
+                        .then(Commands.literal("buy").then(Commands.argument("id", IntegerArgumentType.integer(1))
+                                .executes(ctx -> consignBuy(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "id"), 1))
+                                .then(Commands.argument("count", IntegerArgumentType.integer(1))
+                                        .executes(ctx -> consignBuy(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "id"),
+                                                IntegerArgumentType.getInteger(ctx, "count"))))))
+                        .then(Commands.literal("cancel").then(Commands.argument("id", IntegerArgumentType.integer(1))
+                                .executes(ctx -> {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    String result = com.society.sunlitmarket.consignment.ConsignmentService.cancel(player,
+                                            IntegerArgumentType.getInteger(ctx, "id"));
+                                    ctx.getSource().sendSuccess(() -> Component.literal(result), false);
+                                    return 1;
+                                })))
+                        .then(Commands.literal("mine").executes(ctx -> {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            ctx.getSource().sendSuccess(() -> Component.literal(
+                                    com.society.sunlitmarket.consignment.ConsignmentService.mine(player).toString()), false);
+                            return 1;
+                        }))
+                        .then(Commands.literal("claim").executes(ctx -> {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            String result = com.society.sunlitmarket.consignment.ConsignmentService.deliver(player);
+                            ctx.getSource().sendSuccess(() -> Component.literal(result.isEmpty() ? "没有待领的寄售款" : result), false);
+                            return 1;
+                        }))
+                        .then(Commands.literal("status").requires(ADMIN).executes(ctx -> {
+                            ctx.getSource().sendSuccess(() -> Component.literal(
+                                    com.society.sunlitmarket.consignment.ConsignmentService.status(ctx.getSource().getServer()).toString()), false);
+                            return 1;
+                        })))
                 .then(Commands.literal("chart")
                         .executes(ctx -> openChart(ctx.getSource(), "", MarketData.PERIODS[0]))
                         .then(Commands.argument("id", StringArgumentType.string())

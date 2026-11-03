@@ -480,6 +480,15 @@ public final class SunlitMarketBinding {
         }
     }
 
+    /** SunlitMarket.consignmentFee(200) = the house keeps 2% of every consignment sale (0..2000 bps). */
+    public void consignmentFee(int bps) {
+        try {
+            com.society.sunlitmarket.consignment.ConsignmentService.feeBps(bps);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] SunlitMarket.consignmentFee failed", t);
+        }
+    }
+
     /** Re-reads deposit_values.json; script overrides made before the call are discarded. */
     public void depositReload() {
         try {
