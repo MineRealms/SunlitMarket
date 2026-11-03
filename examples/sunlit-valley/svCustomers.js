@@ -51,17 +51,36 @@ if (typeof SunlitMarket !== 'undefined' && typeof global !== 'undefined' && glob
     SunlitMarket.rule(rule)
   }
 
-  // ---- profession identities -------------------------------------------------
+  // ---- named NPCs: dialog name key -------------------------------------------
+  // The pack names its NPCs with a dialog key (dialog.npc.<id>.name). Profession
+  // display names are rewritten per locale and disagree between zh_cn and en_us
+  // (weaponsmith is "Librarian" in en_us and the storage keeper in zh_cn), so the
+  // key is the only stable identity.
+  let addNamed = (key, faction) => SunlitMarket.rule({
+    type: 'npc', id: 'sv.npc.' + key, faction: faction, rank: 'CIVILIAN', npcKey: key
+  })
+  addNamed('banker', 'society:banker')
+  addNamed('blacksmith', 'society:blacksmith')
+  addNamed('carpenter', 'society:carpenter')
+  addNamed('fisher', 'society:fisher')
+  addNamed('librarian', 'society:librarian')
+  addNamed('market', 'society:market')
+  addNamed('shepherd', 'society:shepherd')
+  addNamed('trader', 'society:trader')
+
+  // ---- ambient villagers: profession id, as the pack maps it ------------------
+  // mason is the pack's mechanic, not the carpenter; fletcher is the exotic trader.
   addNpc('farmer', 'society:farmer', 'minecraft:villager', 'farmer')
-  addNpc('fisher', 'society:fisher', 'minecraft:villager', 'fisherman')
-  addNpc('shepherd', 'society:shepherd', 'minecraft:villager', 'shepherd')
-  addNpc('blacksmith', 'society:blacksmith', 'minecraft:villager', 'toolsmith')
-  addNpc('carpenter', 'society:carpenter', 'minecraft:villager', 'mason')
+  addNpc('fisher_villager', 'society:fisher', 'minecraft:villager', 'fisherman')
+  addNpc('shepherd_villager', 'society:shepherd', 'minecraft:villager', 'shepherd')
+  addNpc('blacksmith_villager', 'society:blacksmith', 'minecraft:villager', 'toolsmith')
   addNpc('butcher', 'society:butcher', 'minecraft:villager', 'butcher')
-  addNpc('librarian', 'society:librarian', 'minecraft:villager', 'librarian')
-  addNpc('banker', 'society:banker', 'minecraft:villager', 'cartographer')
-  addNpc('trader', 'society:trader', 'minecraft:wandering_trader', '')
-  addNpc('market', 'society:market', 'farmingforblockheads:merchant', '')
+  addNpc('librarian_villager', 'society:librarian', 'minecraft:villager', 'librarian')
+  addNpc('librarian_weaponsmith', 'society:librarian', 'minecraft:villager', 'weaponsmith')
+  addNpc('banker_villager', 'society:banker', 'minecraft:villager', 'cartographer')
+  addNpc('trader_fletcher', 'society:trader', 'minecraft:villager', 'fletcher')
+  addNpc('trader_wandering', 'society:trader', 'minecraft:wandering_trader', '')
+  addNpc('market_block', 'society:market', 'farmingforblockheads:merchant', '')
 
   // ---- farm produce ----------------------------------------------------------
   // Raw crops only: crates/bags/blocks are intentionally excluded from counter
