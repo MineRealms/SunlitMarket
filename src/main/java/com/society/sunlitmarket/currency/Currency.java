@@ -61,8 +61,8 @@ public final class Currency {
         Class<?> mod = Class.forName("dev.ithundxr.createnumismatics.Numismatics");
         Object bank = mod.getField("BANK").get(null);
         if (bank == null) throw new IllegalStateException("Bank is not ready");
-        Object account = null;
-        for (Method m : bank.getClass().getMethods()) {
+        Object account = curioAccount(player);
+        if (account == null) for (Method m : bank.getClass().getMethods()) {
             if (!m.getName().equals("getAccount") || m.getParameterCount() != 1) continue;
             if (m.getParameterTypes()[0] == java.util.UUID.class) { account = m.invoke(bank, player.getUUID()); break; }
             if (m.getParameterTypes()[0] == Player.class) { account = m.invoke(bank, player); break; }
@@ -71,6 +71,29 @@ public final class Currency {
         int balance = TradeMath.amount(((Number) account.getClass().getMethod("getBalance").invoke(account)).longValue());
         return new Bank(account, balance, account.getClass().getMethod("setBalance", int.class));
     }
+    private static volatile boolean curioWarned;
+
+    /**
+     * The account the pack itself uses: numismatics_utils resolves a bank card in the curio slot
+     * (possibly a shared account) and falls back to the personal one. The shipping bin, fees and
+     * debt all go through it, so SunlitMarket must too or a card holder would be paid into one
+     * account and charged from another. Null when the utility is absent or cannot be called.
+     */
+    private static Object curioAccount(Player player) {
+        if (!ModList.get().isLoaded("numismatics_utils")) return null;
+        try {
+            Method resolve = Class.forName("io.github.chakyl.numismaticsutils.utils.CurioUtils")
+                    .getMethod("getPersonalOrCurioAccount", net.minecraft.world.level.Level.class, Player.class);
+            return resolve.invoke(null, player.level(), player);
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException ex) {
+            if (!curioWarned) {
+                curioWarned = true;
+                LOG.warn("[SunlitMarket] numismatics_utils account lookup unavailable; using personal accounts", ex);
+            }
+            return null;
+        }
+    }
+
     /** Coins in the inventory plus the numismatics bank account; the virtual wallet is not included. */
     public static int cashBalance(Player player) {
         try { Bank b = bank(player); return b == null ? coinBalance(player) : b.balance; }
