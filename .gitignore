@@ -21,6 +21,7 @@
 !/run-client/kubejs/server_scripts/sunlitmarket/meMerchants.js
 !/run-client/kubejs/server_scripts/sunlitmarket/meSeasonPrices.js
 !/run-client/kubejs/server_scripts/sunlitmarket/themedMerchants.js
+!/run-client/kubejs/server_scripts/sunlitmarket/sm_history.js
 /run-server/*
 !/run-server/kubejs/
 /run-server/kubejs/*

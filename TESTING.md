@@ -331,3 +331,21 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 - 落盘实测：正常退出客户端后 `saves/asverify/data/sunlitmarket_buyback.dat` 生成（121 B）；重启后 `budget=19001`（= 20000 上限 − 上一局已花 999），证明当日累计跨重启保留。`/save-all` 要权限 4，单人 op（2 级）和控制台桥都跑不了，验证靠正常退出。
 - 未验证：跨日真实滚动（需要 `time add 24000` 且预算已花掉），只验证了 `load` 后 `today+1` 的逻辑分支。
 - 重启后再测一遍额度：`budget=19001` → 上限 100 时 `budget=0`、拒绝并提示「今日回收额度已用尽」；上限 2000 时 `budget=1001` → 成交 +999、剩 2；恢复默认后 18002。
+
+## 16. 历史 K 线数据（2026-11-03，run-client 实测）
+
+- 目的：让行情面板有一屏真实的多日 K 线可看，而不是等真实服务器跑十天才有一根日线。
+- 脚本：`run-client/kubejs/server_scripts/sunlitmarket/sm_history.js`（仅 dev 目录，不进整合包）。
+  进世界 100 tick 后注册 `hist_farmer` / `hist_smith` 两个商人 + `hist.harvest` / `hist.metal` 两个指数，
+  然后**每个 4 小时桶做一笔真实买卖**（走 `MarketService` → `Currency.settle` → `recordFill`），
+  把经济时钟推 10 个游戏日，最后自动打开 `/sunlitmarket chart hist.harvest`。
+- 幂等：`hist.harvest` 已有 ≥40 根 4h 蜡烛就整段跳过，重进世界不会重复灌数据。
+- 实测（2026-11-03，run-client/smtest）：`fills=85 buys=60 sells=15 failed=0`，
+  harvest `1d=10 4h=40 value=1010`，metal `1d=11 4h=20 value=1044`，客户端无异常。
+- 坑：**`ServerLevel.getGameTime()` 在 KubeJS 脚本里不可见**（它继承自 `Level`，
+  报 `TypeError: Cannot find function getGameTime in object ServerLevel[world]`）。
+  改走 `world.getLevelData().getGameTime()` / `.setGameTime(long)`——这两个成员由 `ServerLevelData`
+  自己声明，脚本能调到。日界/预算/蜡烛桶全部走 `EconomyClock`（= gameTime），
+  所以推 gameTime 就能造出真实的多日历史；`/time add` 只动 dayTime，对 K 线无效。
+- 踩到的坑：`sunlitmarket_test.js` 里 `let` 后面少空格（`letresults = []`），
+  脚本能加载但一跑就 `ReferenceError`，24 项自检全废。已修（14 处），复跑 **24 passed, 0 failed**。
