@@ -136,11 +136,26 @@ public final class SunlitMarketMod {
             com.society.sunlitmarket.deposit.DepositConfig.save();
             LOG.info("[SunlitMarket] deposit_values.json updated by script");
         }
+        // KubeJS does not always hand script data back: Mohist blocks /reload outright and
+        // `kubejs reload server_scripts` skips the plugin's onServerReload, so the staged
+        // merchants/rules/prices would stay uncommitted until the next boot. Scripts are
+        // evaluated synchronously inside the reload, so one second later is safe to commit.
+        if (com.society.sunlitmarket.market.MarketRegistry.stagingOpen()) {
+            if (++stagingTicks >= 20) {
+                stagingTicks = 0;
+                com.society.sunlitmarket.kjs.SunlitMarketPlugin.commitScripts();
+            }
+        } else {
+            stagingTicks = 0;
+        }
         long day = dayTime / 24000L;
         if (day == lastAlignmentDay) return;
         lastAlignmentDay = day;
         AlignmentData.get(server).roll(day, server);
     }
+
+    /** Ticks spent waiting for a staged script reload to be committed. */
+    private static int stagingTicks;
 
     private void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         if (event.getHand() != InteractionHand.MAIN_HAND) return;

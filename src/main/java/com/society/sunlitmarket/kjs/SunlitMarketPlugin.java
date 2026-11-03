@@ -40,6 +40,25 @@ public final class SunlitMarketPlugin extends KubeJSPlugin {
         return true;
     }
 
+    /**
+     * Commits staged script data when no onServerReload follows. Mohist blocks /reload and
+     * kubejs reload does not always fire the reload callback, so staging would stay pending forever.
+     */
+    public static void commitScripts() {
+        if (!MarketRegistry.stagingOpen()) return;
+        try {
+            boolean valid = scriptsLoaded();
+            MarketRegistry.endScripts(valid);
+            com.society.sunlitmarket.core.MarketRules.endScripts(valid);
+            com.society.sunlitmarket.market.PriceModifiers.endScripts(valid);
+            com.society.sunlitmarket.currency.Currency.endScripts(valid);
+            com.society.sunlitmarket.futures.FuturesSpecs.endScripts(valid);
+            SunlitMarketMod.LOG.info("[SunlitMarket] committed staged script data (valid={})", valid);
+        } catch (Throwable t) {
+            SunlitMarketMod.LOG.warn("[SunlitMarket] staging commit failed", t);
+        }
+    }
+
     @Override
     public void onServerReload() {
         try {

@@ -29,6 +29,8 @@ public final class MarketRegistry {
     private static Map<String, Merchant> staging;
     private static boolean stagingFailed;
     public static synchronized void beginScripts() { staging = new LinkedHashMap<>(); stagingFailed = false; }
+    /** True while a script load is between beginScripts() and endScripts(). */
+    public static synchronized boolean stagingOpen() { return staging != null; }
     public static synchronized void endScripts(boolean valid) {
         if (staging != null && valid && !stagingFailed) { SCRIPTS.clear(); SCRIPTS.putAll(staging); }
         staging = null; changed();
