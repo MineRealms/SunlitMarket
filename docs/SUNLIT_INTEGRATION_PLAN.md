@@ -127,7 +127,7 @@ day = tick / 24000
 | S1 三处对齐 | D1 钱包 + D2 经济日 + D3 npcKey（mod）；`svCustomers.js` 改 npcKey + 修职业表 | 单测：睡觉推进日结 / 回拨不重复 / 跨重启；DEV 客户端右键 easy_npc 能开面板 |
 | S2 接受仓边界 | `-1` 语义 + `depositBlock` + 包脚本遍历 `global.trades` | DEV：出货箱能卖的物品放进去 → 合计 0、按钮置灰 |
 | S3 联动 ✅ | 好感度→结盟、M0、HUD、对话入口、债务先扣（mod：`PayoutSink` / `auditSupply` / 权限拆分） | 代码+单测完成，见 `TESTING.md` §18 的 6 条待验 |
-| S4 部署 | jar + config + 脚本 + 上线说明 | 服务器首日 M0/债务/日结三条曲线不跳变 |
+| S4 部署 ⏳ | jar + config + 脚本 + 上线说明（包已出：`server-pack-20261103-sunlitmarket/`，增量于 20261102） | 服务器首日 M0/债务/日结三条曲线不跳变 |
 
 **C（当铺现金）与 R（发行准备金）不在本方案里拍数字**：C 决定「玩家能不能把东西卖给当铺」，设低了等于关掉收购。S0 量出 M0 后按 C ≈ 2–5% M0、R ≈ 1 个活跃日的回收流水给建议，再由作者定。
 

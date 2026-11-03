@@ -413,9 +413,12 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
 
 ### 部署
 
-- jar `sunlitmarket-1.20.1-0.1.0.jar` md5 `2f4e1abad4a8c7206dc3459f9f9a31b` → 主实例 / -DEV / mirror 三处一致。
+- jar `sunlitmarket-1.20.1-0.1.0.jar` md5 `20ad1371525b6489d508ac729f040cfd` → 主实例 / -DEV / mirror 三处一致
+  （含 `deposit: keep a persisted refusal on reload` 的修复：`-1` 拒收落盘后重新读取仍是 -1，不会被夹成 0）。
 - 五个新脚本同时进主实例和 -DEV；六份 dialog 只进主实例（DEV 没有整合包数据）。
-- `server-pack-20261102-sunlitmarket/delta/` **仍是旧包**（D1–D4 之前的 `svCustomers.js`），S4 需要重打。
+- 新的服务端增量包已出：`server-pack-20261103-sunlitmarket/`（jar + 7 个 sunlitmarket 脚本 + `npcInteraction.js` +
+  6 份 dialog + `deposit_values.json` + 计划文档 + README + SHA256SUMS，jar sha256 `3cefd268…`）。
+  旧的 `server-pack-20261102-sunlitmarket/` 保持原样，作为"上一版基线"存档；本包是它的增量。
 
 ### 待运行时验证（未开客户端）
 
