@@ -71,9 +71,7 @@ public final class DepositConfig {
                 return;
             }
             JsonObject root = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
-            read(root);
-            loaded = true;
-            dirty = false;
+            apply(root);
         } catch (RuntimeException | IOException ex) {
             SunlitMarketMod.LOG.warn("[SunlitMarket] deposit_values.json unreadable; using built-in defaults", ex);
             defaults();
@@ -117,6 +115,13 @@ public final class DepositConfig {
         FLUIDS.put("gtceu:sulfuric_acid", 3);
     }
 
+    /** Parses one already-read document and marks the config loaded; the test seam for {@link #load()}. */
+    static synchronized void apply(JsonObject root) {
+        read(root);
+        loaded = true;
+        dirty = false;
+    }
+
     private static void read(JsonObject root) {
         defaults();
         JsonObject accept = object(root, "accept");
@@ -129,7 +134,9 @@ public final class DepositConfig {
         JsonObject items = object(root, "items");
         for (Map.Entry<String, JsonElement> entry : items.entrySet()) {
             if (!entry.getValue().isJsonPrimitive()) continue;
-            ITEMS.put(entry.getKey(), Math.max(0, entry.getValue().getAsInt()));
+            // -1 is an explicit refusal (SunlitMarket.depositBlock); clamping it to 0 here would
+            // turn a persisted refusal back into "no override" and quietly restore the price.
+            ITEMS.put(entry.getKey(), Math.max(-1, entry.getValue().getAsInt()));
         }
 
         JsonObject fluids = object(root, "fluids");
