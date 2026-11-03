@@ -349,3 +349,25 @@ node tools/season_check.js "<...>/kubejs/server_scripts/sunlitmarket/meSeasonPri
   所以推 gameTime 就能造出真实的多日历史；`/time add` 只动 dayTime，对 K 线无效。
 - 踩到的坑：`sunlitmarket_test.js` 里 `let` 后面少空格（`letresults = []`），
   脚本能加载但一跑就 `ReferenceError`，24 项自检全废。已修（14 处），复跑 **24 passed, 0 failed**。
+
+## 17. 整合包对接（2026-11-03，主实例实测）
+
+按 `docs/SUNLIT_INTEGRATION_PLAN.md` 的 D1–D4 落地第一批：
+
+- **D1 钱包关闭**：`Currency.balance()` 在 `wallet.enabled=false` 时不再计入钱包余额；主实例 `config/sunlitmarket/deposit_values.json` 写入 `wallet.enabled=false`（DEV 同步关闭）。GUI 的钱包带本来就有 enabled 分支，保持置灰。
+- **D2 经济日**：`EconomyClock.tick()` 改为 `max(dayTime, gameTime)`——睡觉推进日结（和出货箱/季节一致），`/time set` 回拨不会重放；`MarketService` 的库存/限购日、`SunlitMarketMod` 的配置落盘与结盟日滚都改用 `EconomyClock`（原来直接读 `dayTime`，日夜循环被冻结时整条 tick 逻辑会停摆）。
+- **D3 NPC 身份**：新增 `npcKey`（`dialog.npc.<id>.name`）选择器：`Merchant.npcKey`、`MarketRegistry.readNpcKey/npcKeyFromJson`、`MarketRules` 的 `npcKey` 条件、`SunlitMarket.npcKey(entity)`；`svCustomers.js` 的有名字 NPC 改走 npcKey，环境村民的职业表按 zh_cn 修正（mason 是机械师，不再当木匠；fletcher 是异域商人；weaponsmith 也算图书管理员）。
+- **D4 接受仓边界**：`items` 支持 `-1 = 拒收`，新增 `SunlitMarket.depositBlock(item)`；`svAcceptBoundary.js` 启动时把 `global.trades` 全部拒收。
+
+**主实例实测**（435 mod，jar `db3798c7…`）：
+- `sunlitmarket/svAcceptBoundary.js#24: [SM-INTEGRATION] acceptance bin refuses 2337 shipping-bin items`
+- `Loaded 235/235 KubeJS server scripts in 0.686 s with 0 errors and 0 warnings`
+- `[SunlitMarket] ready (numismatics=true)`
+
+**坑（新）**：
+- DEV 实例的 kubejs 是精简副本，**没有 `globalRegistry.js`**，所以 `global.trades` 不存在，`svCustomers.js` / `svAcceptBoundary.js` 在那里整段跳过（日志会打 `boundary skipped ... trades=missing`）。整合包脚本只能在主实例验证。
+- KubeJS 的类过滤器拒绝 `Java.loadClass('java.lang.System')`，读系统属性请换别的门控（历史数据脚本改用世界名）。
+- `ServerLevel.getGameTime()` 在脚本里不可见（继承自 `Level`），要用 `getLevelData().getGameTime()`。
+
+**未完成/阻塞**：
+- `wltest` 世界在 `ServerStartedEvent` 崩溃：`ftbbackups2 BackupHandler.initPreview` 的 `Block.m_284356_()` NPE（与本 mod 无关，属既有问题），因此该世界跑不到 tick 循环，配置落盘的运行时复核改在 DEV 做（DEV 09:40 已实测落盘）。
