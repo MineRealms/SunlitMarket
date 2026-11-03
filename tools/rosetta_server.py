@@ -13,21 +13,36 @@ Usage:
 import base64
 import io
 import json
+import os
 import socket
 import sys
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-HOST = "frp-top.com"
-PORT = 17799
-TOKEN = "5qDnF4arJtN2JCK9bMbemrp47kFc"
+CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rosetta.local.json")
+
+
+def load_config():
+    """Connection details live outside git: tools/rosetta.local.json or SM_ROSETTA_* variables."""
+    data = {}
+    if os.path.isfile(CONFIG):
+        with open(CONFIG, encoding="utf-8") as handle:
+            data = json.load(handle)
+    host = os.environ.get("SM_ROSETTA_HOST", data.get("host", ""))
+    port = int(os.environ.get("SM_ROSETTA_PORT", data.get("port", 0)) or 0)
+    token = os.environ.get("SM_ROSETTA_TOKEN", data.get("token", ""))
+    if not host or not port or not token:
+        sys.exit("missing Rosetta connection: create tools/rosetta.local.json "
+                 '({"host": ..., "port": ..., "token": ...}) or set SM_ROSETTA_HOST/PORT/TOKEN')
+    return host, port, token
 
 
 def call(cmd, args=None, timeout=180):
-    sock = socket.create_connection((HOST, PORT), timeout=timeout)
+    host, port, token = load_config()
+    sock = socket.create_connection((host, port), timeout=timeout)
     sock.settimeout(timeout)
     stream = sock.makefile("rwb")
-    payload = {"token": TOKEN, "cmd": cmd}
+    payload = {"token": token, "cmd": cmd}
     if args:
         payload["args"] = args
     stream.write((json.dumps(payload) + "\n").encode("utf-8"))

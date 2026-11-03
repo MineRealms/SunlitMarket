@@ -46,3 +46,6 @@
 /.local/
 *.log
 hs_err_pid*
+
+# Remote server credentials stay on this machine
+/tools/rosetta.local.json
