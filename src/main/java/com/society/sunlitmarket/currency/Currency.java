@@ -77,6 +77,7 @@ public final class Currency {
     public static int balance(Player player) {
         int cash = cashBalance(player);
         if (cash < 0) return cash;
+        if (!com.society.sunlitmarket.wallet.Wallet.enabled()) return cash;
         long wallet = com.society.sunlitmarket.wallet.Wallet.balance(player);
         return (int) Math.min(Integer.MAX_VALUE, cash + wallet);
     }
