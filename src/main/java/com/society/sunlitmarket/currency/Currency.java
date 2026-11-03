@@ -20,6 +20,9 @@ import java.util.Map;
 
 /** Prepared inventory settlement. An installed but failing bank never silently switches backend. */
 public final class Currency {
+    /** Own logger: SunlitMarketMod's static init builds a network channel and must not be
+     *  forced from a unit test that only exercises settlement maths. */
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("sunlitmarket");
     private static final Map<String, Integer> VALUES = new LinkedHashMap<>();
     private static Map<String, Integer> staging;
     static { resetValues(); }
@@ -160,26 +163,60 @@ public final class Currency {
 
     private static String observedSettle(Player player, Container source, Container target, ItemStack item, int count, int moneyDelta, boolean useWallet, String reason) {
         SettlementObservation observation = new SettlementObservation();
+        int requested = moneyDelta;
+        PayoutSink sink = moneyDelta > 0 ? PAYOUT_SINK : null;
+        long diverted = sink == null ? 0L : divert(sink, player, moneyDelta, reason);
+        moneyDelta -= (int) diverted;
         String result;
         try {
             result = settleInternal(player, source, target, item, count, moneyDelta, useWallet, observation);
         } catch (RuntimeException ex) {
             observation.uncertain();
-            auditSettlement(player, item, count, moneyDelta, reason, observation);
+            restoreDiverted(sink, player, diverted, reason);
+            auditSettlement(player, item, count, requested, reason, observation, diverted);
             throw ex;
         }
-        auditSettlement(player, item, count, moneyDelta, reason, observation);
+        if (!result.isEmpty()) restoreDiverted(sink, player, diverted, reason);
+        auditSettlement(player, item, count, requested, reason, observation, diverted);
         return result;
     }
 
-    private static void auditSettlement(Player player, ItemStack item, int count, int moneyDelta, String fallback, SettlementObservation observation) {
+    /** Packs settle debt (or anything else) before the player sees a payout. */
+    private static volatile PayoutSink PAYOUT_SINK;
+
+    /** Installs the diversion hook; {@code null} restores plain payouts. */
+    public static void payoutSink(PayoutSink sink) { PAYOUT_SINK = sink; }
+
+    public static PayoutSink payoutSink() { return PAYOUT_SINK; }
+
+    static long divert(PayoutSink sink, Player player, long amount, String reason) {
+        try {
+            return Math.max(0L, Math.min(amount, sink.divert(player, amount, reason)));
+        } catch (Throwable ex) {
+            LOG.warn("[SunlitMarket] payout sink failed to divert; full payout kept", ex);
+            return 0L;
+        }
+    }
+
+    private static void restoreDiverted(PayoutSink sink, Player player, long diverted, String reason) {
+        if (sink == null || diverted <= 0) return;
+        try {
+            sink.rollback(player, diverted, reason);
+        } catch (Throwable ex) {
+            LOG.error("[SunlitMarket] payout sink could not restore {} diverted from {}", diverted, player == null ? "?" : player.getName().getString(), ex);
+        }
+    }
+
+    private static void auditSettlement(Player player, ItemStack item, int count, int moneyDelta, String fallback,
+                                        SettlementObservation observation, long diverted) {
         try {
             if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
                 String goods = BuiltInRegistries.ITEM.getKey(item.getItem()) + " x" + count;
                 EconomyAudit.emit(sp.server, EconomyAudit.reason(fallback), observation.backend(), observation.outcome(),
                         moneyDelta, observation.delta(), player.getUUID(), EconomyAudit.operation(),
                         observation.grossCreated(), observation.grossRemoved(),
-                        "settlement payment leg; goods=" + goods + "; not a full business transaction or total supply");
+                        "settlement payment leg; goods=" + goods + "; diverted=" + diverted
+                                + "; not a full business transaction or total supply");
             }
         } catch (Throwable ignored) {}
     }
