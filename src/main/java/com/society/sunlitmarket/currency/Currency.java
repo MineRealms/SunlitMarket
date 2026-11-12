@@ -279,7 +279,13 @@ public final class Currency {
             if (player.getPersistentData().getBoolean("sunlitmarket.bankUncertain")) return "银行需管理员核对后解锁";
             b = (moneyDelta == 0 || walletDebit) ? null : bank(player);
             observation.backend(walletDebit ? "WALLET" : b != null ? "BANK" : moneyDelta == 0 ? "NONE" : "COINS");
-            int next = b == null ? 0 : TradeMath.amount((long) b.balance + moneyDelta);
+            // A bank debit that would overdraw (or a payout that would overflow the int account)
+            // is a normal refused trade, not a settlement failure: refuse before any write happens.
+            int next = 0;
+            if (b != null) {
+                next = TradeMath.balanceAfter(b.balance, moneyDelta);
+                if (next < 0) return moneyDelta < 0 ? "余额不足，无法完成支付" : "金额超出账户上限";
+            }
             if (b == null && !walletDebit && !coins(walletMain, moneyDelta, observation)) return "余额不足、无法精确找零或背包空间不足";
             if (count > 0 && target != null && !insert(target == wallet ? walletMain : plans.get(target), item, count, target.getMaxStackSize()))
                 return "目标库存空间不足";

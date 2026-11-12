@@ -8,6 +8,13 @@ class TradeMathTest {
     @Test void validPositivePricesRoundOnce(){assertEquals(72,TradeMath.price(90,.8));assertEquals(84,TradeMath.price(70,1.2));assertEquals(1,TradeMath.price(1,.1));}
     @Test void invalidMultipliersAreRejected(){for(double d:new double[]{0,-1,Double.NaN,Double.POSITIVE_INFINITY})assertThrows(IllegalArgumentException.class,()->TradeMath.price(5,d));}
     @Test void overflowingAmountsAreRejected(){assertThrows(IllegalArgumentException.class,()->TradeMath.amount((long)Integer.MAX_VALUE+1));assertThrows(IllegalArgumentException.class,()->TradeMath.amount(-1));}
+    @Test void bankBalanceRefusesOutOfRangeInsteadOfThrowing(){
+        assertEquals(0,TradeMath.balanceAfter(14,-14));
+        assertEquals(5,TradeMath.balanceAfter(19,-14));
+        assertEquals(-1,TradeMath.balanceAfter(0,-14));
+        assertEquals(-1,TradeMath.balanceAfter(0,(long)Integer.MAX_VALUE+1));
+        assertEquals(-1,TradeMath.balanceAfter(Integer.MAX_VALUE,1));
+    }
     @Test void clampUsesLongBeforeLimiting(){assertEquals(3000,TradeMath.clamp((long)Integer.MAX_VALUE+1,-1000,3000));}
     @Test void firstDayAndBackwardsDaysDoNotDecay(){assertEquals(0,TradeMath.days(Long.MIN_VALUE,100));assertEquals(0,TradeMath.days(10,9));assertEquals(0,TradeMath.days(10,10));}
     @Test void jumpedDaysCountElapsedDays(){assertEquals(3,TradeMath.days(10,13));assertEquals(197,TradeMath.decay(200,3,1));assertEquals(-47,TradeMath.decay(-50,3,1));}

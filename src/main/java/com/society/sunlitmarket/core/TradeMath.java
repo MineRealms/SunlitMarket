@@ -7,6 +7,11 @@ public final class TradeMath {
         if (value < 0 || value > Integer.MAX_VALUE) throw new IllegalArgumentException("Amount out of range");
         return (int) value;
     }
+    /** New bank balance after a signed delta, or -1 when it would leave [0, Integer.MAX_VALUE]. */
+    public static int balanceAfter(long balance, long delta) {
+        long next = balance + delta;
+        return next < 0 || next > Integer.MAX_VALUE ? -1 : (int) next;
+    }
     public static int price(int base, double multiplier) {
         if (base <= 0) return 0;
         if (!Double.isFinite(multiplier) || multiplier <= 0) throw new IllegalArgumentException("Invalid multiplier");
