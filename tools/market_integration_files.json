@@ -1,0 +1,20 @@
+[
+  "kubejs/server_scripts/sunlitHud.js",
+  "kubejs/server_scripts/sunlitmarket/meMerchants.js",
+  "kubejs/server_scripts/sunlitmarket/meSeasonPrices.js",
+  "kubejs/server_scripts/sunlitmarket/svHud.js",
+  "kubejs/server_scripts/sunlitmarket/svMastery.js",
+  "kubejs/server_scripts/sunlitmarket/svMeCustomers.js",
+  "kubejs/server_scripts/sunlitmarket/themedMerchants.js",
+  "kubejs/data/dialog/dialogs/sunlitmarket_banker_choice.json",
+  "kubejs/data/dialog/dialogs/sunlitmarket_blacksmith_choice.json",
+  "kubejs/data/dialog/dialogs/sunlitmarket_fisher_choice.json",
+  "kubejs/data/dialog/dialogs/sunlitmarket_market_choice.json",
+  "kubejs/data/dialog/dialogs/sunlitmarket_shepherd_choice.json",
+  "kubejs/data/dialog/dialogs/sunlitmarket_trader_choice.json",
+  "config/ftbquests/quests/chapters/tinkers.snbt",
+  "config/ftbquests/quests/chapters/thaumic_industry.snbt",
+  "config/ftbquests/quests/chapters/astral_sorcery.snbt",
+  "config/ftbquests/quests/chapters/botania.snbt",
+  "config/ftbquests/quests/chapters/trade.snbt"
+]

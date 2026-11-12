@@ -1,0 +1,14 @@
+var server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+((java.util.concurrent.Executor) server).execute(() -> {
+    try {
+        var method = com.society.sunlitmarket.core.MarketRules.class.getDeclaredMethod("all");
+        method.setAccessible(true);
+        var rows = (java.util.List<com.google.gson.JsonObject>) method.invoke(null);
+        com.google.gson.JsonArray rules = new com.google.gson.JsonArray();
+        for (var row : rows) if (row.has("type") && row.get("type").getAsString().equals("npc")) rules.add(row);
+        com.society.sunlitmarket.SunlitMarketMod.LOG.info("[SM-RULES-PROBE] {}", rules);
+    } catch (Throwable error) {
+        com.society.sunlitmarket.SunlitMarketMod.LOG.error("[SM-RULES-PROBE] FAIL", error);
+    }
+});
+return "Read-only rules inspection scheduled";
